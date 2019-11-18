@@ -7,9 +7,9 @@ const app = new PIXI.Application(600, 400);
 const client = new DeepstreamClient('wss://devilsrunscribe.csh.rit.edu:9090')
 client.login()
 
-let gameObjects = {};
+let stateObjects = {};
 
-let isMobile, state, playerID, worldID, left, right, up, down;
+let isMobile, state, worldID, worldRecord;
 
 setup();
 
@@ -17,82 +17,99 @@ function setup() {
     // #2 - Append its "view" (a <canvas> tag that it created for us) to the DOM
     document.body.appendChild(app.view);
 
-    app.renderer.backgroundColor = 0xFF00FF;
+    app.renderer.backgroundColor = 0x42dcff;
 
     //Detects if we are on mobile or PC
     let ua = window.navigator.userAgent.toLowerCase();
     isMobile = typeof window.orientation !== "undefined" || ua.indexOf('iemobile') !== -1 || ua.indexOf('mobile') !== -1 || ua.indexOf('android') !== -1;
 
     worldID = "0001";
+    worldRecord = client.record.getRecord(`worlds/${worldID}`);
 
-    if (isMobile) {
-        setupController();
-    }
-    else {
-        setupDisplay();
-    }
+    worldRecord.whenReady(function () {
+        if (isMobile) {
+            setupController();
+        }
+        else {
+            setupDisplay();
+        }
+    });
 }
 
 function setupController() {
-    let numOfPlayers = client.record.getRecord("worlds/" + worldID);
-
     //Sets up the player ID
-    playerID = numOfPlayers.get('numOfPlayers');
+    stateObjects.playerID = worldRecord.get('numOfPlayers');
 
-    numOfPlayers.set('numOfPlayers', numOfPlayers.get('numOfPlayers') + 1);
+    console.log(worldRecord.get('numOfPlayers'));
 
-    // #1 - make a square
-    // http://pixijs.download/dev/docs/PIXI.Graphics.html
-    const moveLeftButton = new PIXI.Graphics();
-    moveLeftButton.beginFill(0xFF0000); 	// red in hexadecimal
-    moveLeftButton.lineStyle(3, 0xFFFF00, 1); // lineWidth,color in hex, alpha
-    moveLeftButton.drawRect(0, 0, 40, 40); 	// x,y,width,height
-    moveLeftButton.endFill();
-    moveLeftButton.x = 25;
-    moveLeftButton.y = 50;
-    moveLeftButton.on('pointerdown', function(e) {
-        client.record.getRecord("worlds/" + worldID).set("moveLeft", playerID);
+    worldRecord.setWithAck('numOfPlayers', worldRecord.get('numOfPlayers') + 1).then(function () {
+
+        client.event.emit('controllerConnecting', stateObjects.playerID);
+
+        // Make a square
+        const moveLeftButton = new PIXI.Graphics();
+        moveLeftButton.beginFill(0xFF0000); 	// red in hexadecimal
+        moveLeftButton.lineStyle(3, 0xFFFF00, 1); // lineWidth,color in hex, alpha
+        moveLeftButton.drawRect(0, 0, 40, 40); 	// x,y,width,height
+        moveLeftButton.endFill();
+        moveLeftButton.x = 25;
+        moveLeftButton.y = 50;
+        moveLeftButton.interactive = true;
+        moveLeftButton.on('touchstart', function (e) {
+            console.log("touch started left");
+            client.event.emit("beginMoveLeft", stateObjects.playerID);
+        });
+        moveLeftButton.on('touchend', function (e) {
+            console.log("touch ended left");
+            client.event.emit("endMoveLeft", stateObjects.playerID);
+        });
+        app.stage.addChild(moveLeftButton);  	// now you can see it
+
+        // Make a square
+        const moveRightButton = new PIXI.Graphics();
+        moveRightButton.beginFill(0xFF0000); 	// red in hexadecimal
+        moveRightButton.lineStyle(3, 0xFFFF00, 1); // lineWidth,color in hex, alpha
+        moveRightButton.drawRect(0, 0, 40, 40); 	// x,y,width,height
+        moveRightButton.endFill();
+        moveRightButton.x = 75;
+        moveRightButton.y = 50;
+        moveRightButton.interactive = true;
+        moveRightButton.on('touchstart', function (e) {
+            console.log("touch started right");
+            client.event.emit("beginMoveRight", stateObjects.playerID);
+        });
+        moveRightButton.on('touchend', function (e) {
+            console.log("touch ended right");
+            client.event.emit("endMoveRight", stateObjects.playerID);
+        });
+        app.stage.addChild(moveRightButton);  	// now you can see it
     });
-    app.stage.addChild(moveLeftButton);  	// now you can see it
-
-    // #1 - make a square
-    // http://pixijs.download/dev/docs/PIXI.Graphics.html
-    const moveRightButton = new PIXI.Graphics();
-    moveRightButton.beginFill(0xFF0000); 	// red in hexadecimal
-    moveRightButton.lineStyle(3, 0xFFFF00, 1); // lineWidth,color in hex, alpha
-    moveRightButton.drawRect(0, 0, 40, 40); 	// x,y,width,height
-    moveRightButton.endFill();
-    moveRightButton.x = 75;
-    moveRightButton.y = 50;
-    moveRightButton.on('pointerdown', function(e) {
-        client.record.getRecord("worlds/" + worldID).set("moveRight", playerID);
-    });
-    app.stage.addChild(moveRightButton);  	// now you can see it
-
 }
 
 function setupDisplay() {
-    gameObjects.players = [];
+    stateObjects.players = [];
 
-    let worldRecord = client.record.getRecord("worlds/" + worldID);
+    worldRecord.setWithAck('numOfPlayers', 0).then(function () {
 
-    worldRecord.set("numOfPlayers", 0);
+        console.log(worldRecord.get());
 
-    //Capture the keyboard arrow keys
-    left = keyboard("ArrowLeft");
-    up = keyboard("ArrowUp");
-    right = keyboard("ArrowRight");
-    down = keyboard("ArrowDown");
+        //Capture the keyboard arrow keys
+        stateObjects.confirm = keyboard("Enter");
+        stateObjects.back = keyboard("Escape");
 
-    worldRecord.subscribe('numOfPlayers', playerLogin);
-    worldRecord.subscribe('moveLeft', moveLeft);
-    worldRecord.subscribe('moveRight', moveRight);
+        client.event.subscribe('beginMoveLeft', beginMoveLeft);
+        client.event.subscribe('beginMoveRight', beginMoveRight);
+        client.event.subscribe('endMoveLeft', endMoveLeft);
+        client.event.subscribe('endMoveRight', endMoveRight);
 
-    //Set the game state
-    state = play;
+        client.event.subscribe('controllerConnecting', playerLogin);
 
-    //Start the game loop 
-    app.ticker.add(delta => gameLoop(delta));
+        //Set the game state
+        state = play;
+
+        //Start the game loop 
+        app.ticker.add(delta => gameLoop(delta));
+    });
 }
 
 function gameLoop(delta) {
@@ -101,17 +118,29 @@ function gameLoop(delta) {
 }
 
 function play(delta) {
+    stateObjects.players.forEach(function (player) { player.x += player.vx; });
 }
 
-function moveLeft(value){
-    gameObjects.players[value].x -= 3;
+function beginMoveLeft(value) {
+    stateObjects.players[value].vx = -3;
 }
 
-function moveRight(value){
-    gameObjects.players[value].x += 3;
+function beginMoveRight(value) {
+    stateObjects.players[value].vx = 3;
+}
+
+function endMoveLeft(value) {
+    if (stateObjects.players[value].vx == -3)
+        stateObjects.players[value].vx = 0;
+}
+
+function endMoveRight(value) {
+    if (stateObjects.players[value].vx == 3)
+        stateObjects.players[value].vx = 0;
 }
 
 function playerLogin() {
+    console.log("Logging in");
     //make a circle player stand-in
     let player = new PIXI.Graphics();
     player.beginFill(0xFF0000);
@@ -119,7 +148,8 @@ function playerLogin() {
     player.endFill();
     player.x = 125;
     player.y = 50;
-    gameObjects.players.push(player);
+    player.vx = 0;
+    stateObjects.players.push(player);
     app.stage.addChild(player);
 }
 
