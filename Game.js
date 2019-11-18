@@ -83,7 +83,7 @@ function setupController() {
             client.event.emit("endMoveRight", stateObjects.playerID);
         });
         app.stage.addChild(moveRightButton);  	// now you can see it
-    });
+    }).catch(function(){console.log("Oh gee.");});
 }
 
 function setupDisplay() {
@@ -109,7 +109,7 @@ function setupDisplay() {
 
         //Start the game loop 
         app.ticker.add(delta => gameLoop(delta));
-    });
+    }).catch(function(){console.log("Oh gee.");});
 }
 
 function gameLoop(delta) {
