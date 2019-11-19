@@ -51,10 +51,10 @@ function setupController() {
             const moveLeftButton = new PIXI.Graphics();
             moveLeftButton.beginFill(0xFF0000); 	// red in hexadecimal
             moveLeftButton.lineStyle(3, 0xFFFF00, 1); // lineWidth,color in hex, alpha
-            moveLeftButton.drawRect(0, 0, 40, 40); 	// x,y,width,height
+            moveLeftButton.drawRect(0, 0, 80, 80); 	// x,y,width,height
             moveLeftButton.endFill();
-            moveLeftButton.x = 25;
-            moveLeftButton.y = 50;
+            moveLeftButton.x = 10;
+            moveLeftButton.y = 10;
             moveLeftButton.interactive = true;
             moveLeftButton.on('touchstart', function (e) {
                 console.log("touch started left");
@@ -62,7 +62,7 @@ function setupController() {
             });
             moveLeftButton.on('touchend', function (e) {
                 console.log("touch ended left");
-                client.event.emit("endMoveLeft", stateObjects.playerID);
+                client.event.emit("endMove", stateObjects.playerID);
             });
             app.stage.addChild(moveLeftButton);  	// now you can see it
 
@@ -70,10 +70,10 @@ function setupController() {
             const moveRightButton = new PIXI.Graphics();
             moveRightButton.beginFill(0xFF0000); 	// red in hexadecimal
             moveRightButton.lineStyle(3, 0xFFFF00, 1); // lineWidth,color in hex, alpha
-            moveRightButton.drawRect(0, 0, 40, 40); 	// x,y,width,height
+            moveRightButton.drawRect(0, 0, 80, 80); 	// x,y,width,height
             moveRightButton.endFill();
-            moveRightButton.x = 75;
-            moveRightButton.y = 50;
+            moveRightButton.x = 100;
+            moveRightButton.y = 10;
             moveRightButton.interactive = true;
             moveRightButton.on('touchstart', function (e) {
                 console.log("touch started right");
@@ -81,7 +81,7 @@ function setupController() {
             });
             moveRightButton.on('touchend', function (e) {
                 console.log("touch ended right");
-                client.event.emit("endMoveRight", stateObjects.playerID);
+                client.event.emit("endMove", stateObjects.playerID);
             });
             app.stage.addChild(moveRightButton);  	// now you can see it
         });
@@ -98,8 +98,7 @@ function setupDisplay() {
 
     client.event.subscribe('beginMoveLeft', beginMoveLeft);
     client.event.subscribe('beginMoveRight', beginMoveRight);
-    client.event.subscribe('endMoveLeft', endMoveLeft);
-    client.event.subscribe('endMoveRight', endMoveRight);
+    client.event.subscribe('endMove', endMove);
 
     client.event.subscribe('controllerConnecting', playerLogin);
 
@@ -116,7 +115,7 @@ function gameLoop(delta) {
 }
 
 function play(delta) {
-    stateObjects.players.forEach(function (player) { player.x += player.vx; });
+    stateObjects.players.forEach(function (player) { player.move(); });
 }
 
 function beginMoveLeft(value) {
@@ -127,28 +126,16 @@ function beginMoveRight(value) {
     stateObjects.players[value].vx = 3;
 }
 
-function endMoveLeft(value) {
-    if (stateObjects.players[value].vx == -3)
-        stateObjects.players[value].vx = 0;
-}
-
-function endMoveRight(value) {
-    if (stateObjects.players[value].vx == 3)
-        stateObjects.players[value].vx = 0;
+function endMove(value) {
+    stateObjects.players[value].vx = 0;
 }
 
 function playerLogin() {
     console.log("Logging in");
-    //make a circle player stand-in
-    let player = new PIXI.Graphics();
-    player.beginFill(0xFF0000);
-    player.drawCircle(0, 0, 20);
-    player.endFill();
-    player.x = 125;
-    player.y = 50;
-    player.vx = 0;
-    stateObjects.players.push(player);
+    //make a Player stand-in
+    let player = new Player();
     app.stage.addChild(player);
+    stateObjects.players.push(player);
     client.event.emit('getPlayerID', stateObjects.players.length - 1);
     console.log("Now joining: Player ID " + (stateObjects.players.length - 1));
 }
@@ -201,3 +188,21 @@ function keyboard(value) {
     return key;
 }
 
+class Player extends PIXI.Graphics{
+    constructor(color=0xFF0000, radius=20, x=125, y=50){
+        super();
+        this.beginFill(color);
+        this.drawCircle(0, 0, radius);
+        this.endFill();
+        this.x = x;
+        this.y = y;
+        this.vx = 0;
+        this.vy = 0;
+    }
+
+    move(){
+        this.x += this.vx;
+        this.y += this.vy;
+    }
+
+}
