@@ -37,79 +37,77 @@ function setup() {
 }
 
 function setupController() {
-    //Sets up the player ID
-    stateObjects.playerID = worldRecord.get('numOfPlayers');
+    worldRecord.whenReady(record => {
 
-    console.log(worldRecord.get('numOfPlayers'));
+        //Sets up the player ID
+        stateObjects.playerID = -1;
+        client.event.subscribe('getPlayerID', function (id) { stateObjects.playerID = id; client.event.unsubscribe('getPlayerID'); });
 
-    worldRecord.setWithAck('numOfPlayers', worldRecord.get('numOfPlayers') + 1).then(function () {
+        record.whenReady(record => {
 
-        client.event.emit('controllerConnecting', stateObjects.playerID);
+            client.event.emit('controllerConnecting');
 
-        // Make a square
-        const moveLeftButton = new PIXI.Graphics();
-        moveLeftButton.beginFill(0xFF0000); 	// red in hexadecimal
-        moveLeftButton.lineStyle(3, 0xFFFF00, 1); // lineWidth,color in hex, alpha
-        moveLeftButton.drawRect(0, 0, 40, 40); 	// x,y,width,height
-        moveLeftButton.endFill();
-        moveLeftButton.x = 25;
-        moveLeftButton.y = 50;
-        moveLeftButton.interactive = true;
-        moveLeftButton.on('touchstart', function (e) {
-            console.log("touch started left");
-            client.event.emit("beginMoveLeft", stateObjects.playerID);
+            // Make a square
+            const moveLeftButton = new PIXI.Graphics();
+            moveLeftButton.beginFill(0xFF0000); 	// red in hexadecimal
+            moveLeftButton.lineStyle(3, 0xFFFF00, 1); // lineWidth,color in hex, alpha
+            moveLeftButton.drawRect(0, 0, 40, 40); 	// x,y,width,height
+            moveLeftButton.endFill();
+            moveLeftButton.x = 25;
+            moveLeftButton.y = 50;
+            moveLeftButton.interactive = true;
+            moveLeftButton.on('touchstart', function (e) {
+                console.log("touch started left");
+                client.event.emit("beginMoveLeft", stateObjects.playerID);
+            });
+            moveLeftButton.on('touchend', function (e) {
+                console.log("touch ended left");
+                client.event.emit("endMoveLeft", stateObjects.playerID);
+            });
+            app.stage.addChild(moveLeftButton);  	// now you can see it
+
+            // Make a square
+            const moveRightButton = new PIXI.Graphics();
+            moveRightButton.beginFill(0xFF0000); 	// red in hexadecimal
+            moveRightButton.lineStyle(3, 0xFFFF00, 1); // lineWidth,color in hex, alpha
+            moveRightButton.drawRect(0, 0, 40, 40); 	// x,y,width,height
+            moveRightButton.endFill();
+            moveRightButton.x = 75;
+            moveRightButton.y = 50;
+            moveRightButton.interactive = true;
+            moveRightButton.on('touchstart', function (e) {
+                console.log("touch started right");
+                client.event.emit("beginMoveRight", stateObjects.playerID);
+            });
+            moveRightButton.on('touchend', function (e) {
+                console.log("touch ended right");
+                client.event.emit("endMoveRight", stateObjects.playerID);
+            });
+            app.stage.addChild(moveRightButton);  	// now you can see it
         });
-        moveLeftButton.on('touchend', function (e) {
-            console.log("touch ended left");
-            client.event.emit("endMoveLeft", stateObjects.playerID);
-        });
-        app.stage.addChild(moveLeftButton);  	// now you can see it
+    });
 
-        // Make a square
-        const moveRightButton = new PIXI.Graphics();
-        moveRightButton.beginFill(0xFF0000); 	// red in hexadecimal
-        moveRightButton.lineStyle(3, 0xFFFF00, 1); // lineWidth,color in hex, alpha
-        moveRightButton.drawRect(0, 0, 40, 40); 	// x,y,width,height
-        moveRightButton.endFill();
-        moveRightButton.x = 75;
-        moveRightButton.y = 50;
-        moveRightButton.interactive = true;
-        moveRightButton.on('touchstart', function (e) {
-            console.log("touch started right");
-            client.event.emit("beginMoveRight", stateObjects.playerID);
-        });
-        moveRightButton.on('touchend', function (e) {
-            console.log("touch ended right");
-            client.event.emit("endMoveRight", stateObjects.playerID);
-        });
-        app.stage.addChild(moveRightButton);  	// now you can see it
-    }).catch(function(){console.log("Oh gee.");});
 }
 
 function setupDisplay() {
     stateObjects.players = [];
 
-    worldRecord.setWithAck('numOfPlayers', 0).then(function () {
+    //Capture the keyboard arrow keys
+    stateObjects.confirm = keyboard("Enter");
+    stateObjects.back = keyboard("Escape");
 
-        console.log(worldRecord.get());
+    client.event.subscribe('beginMoveLeft', beginMoveLeft);
+    client.event.subscribe('beginMoveRight', beginMoveRight);
+    client.event.subscribe('endMoveLeft', endMoveLeft);
+    client.event.subscribe('endMoveRight', endMoveRight);
 
-        //Capture the keyboard arrow keys
-        stateObjects.confirm = keyboard("Enter");
-        stateObjects.back = keyboard("Escape");
+    client.event.subscribe('controllerConnecting', playerLogin);
 
-        client.event.subscribe('beginMoveLeft', beginMoveLeft);
-        client.event.subscribe('beginMoveRight', beginMoveRight);
-        client.event.subscribe('endMoveLeft', endMoveLeft);
-        client.event.subscribe('endMoveRight', endMoveRight);
+    //Set the game state
+    state = play;
 
-        client.event.subscribe('controllerConnecting', playerLogin);
-
-        //Set the game state
-        state = play;
-
-        //Start the game loop 
-        app.ticker.add(delta => gameLoop(delta));
-    }).catch(function(){console.log("Oh gee.");});
+    //Start the game loop 
+    app.ticker.add(delta => gameLoop(delta));
 }
 
 function gameLoop(delta) {
@@ -151,6 +149,8 @@ function playerLogin() {
     player.vx = 0;
     stateObjects.players.push(player);
     app.stage.addChild(player);
+    client.event.emit('getPlayerID', stateObjects.players.length - 1);
+    console.log("Now joining: Player ID " + (stateObjects.players.length - 1));
 }
 
 //https://github.com/kittykatattack/learningPixi#keyboard
