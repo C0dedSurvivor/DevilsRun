@@ -37,6 +37,17 @@ function setup() {
 }
 
 function setupController() {
+    stateObjects.roomSelectScene = new PIXI.Container();
+    app.stage.addChild(stateObjects.roomSelectScene);
+    
+    stateObjects.teamSelectScene = new PIXI.Container();
+    stateObjects.teamSelectScene.visible = false;
+    app.stage.addChild(stateObjects.teamSelectScene);
+    
+    stateObjects.controllerScene = new PIXI.Container();
+    stateObjects.controllerScene.visible = false;
+    app.stage.addChild(stateObjects.controllerScene);
+
     worldRecord.whenReady(record => {
 
         //Sets up the player ID
