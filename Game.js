@@ -11,20 +11,56 @@ let stateObjects = {};
 
 let isMobile, state, worldID, worldRecord;
 
+
+app.renderer.backgroundColor = 0x42dcff;
+
+//Detects if we are on mobile or PC
+let ua = window.navigator.userAgent.toLowerCase();
+isMobile = typeof window.orientation !== "undefined" || ua.indexOf('iemobile') !== -1 || ua.indexOf('mobile') !== -1 || ua.indexOf('android') !== -1;
+
 setup();
 
 function setup() {
+    if (isMobile) {
+        stateObjects.playerID = -1;
+        document.querySelector("main").innerHTML = "<input id='roomselector' type='text' size='4' maxlength='4' autofocus value='Q0X3' /><button type='button' id='roombutton' onclick='joinRoom()'>Join Room</button>"
+    }
+    else {
+        generateView("Q0X3");
+    }
+}
+
+function joinRoom() {
+    let room = document.querySelector("#roomselector").value;
+    document.querySelector("#roombutton").interactive = false;
+
+    client.event.subscribe(`getPlayerID${room}`, function (id) {
+        stateObjects.playerID = id;
+        generateView(room);
+        document.querySelector("main").innerHTML = "";
+        client.event.unsubscribe(`getPlayerID${room}`);
+        client.event.unsubscribe(`rejectPlayer${room}`);
+    });
+
+    client.event.subscribe(`rejectPlayer${room}`, function (id) {
+        document.querySelector("#roombutton").interactive = true;
+        client.event.unsubscribe(`getPlayerID${room}`);
+        client.event.unsubscribe(`rejectPlayer${room}`);
+    });
+    
+    setTimeout(function(){
+        client.event.emit(`controllerConnecting${room}`);
+    }, 1000);
+}
+
+function generateView(roomID) {
     // #2 - Append its "view" (a <canvas> tag that it created for us) to the DOM
-    document.body.appendChild(app.view);
+    document.querySelector("main").appendChild(app.view);
 
-    app.renderer.backgroundColor = 0x42dcff;
-
-    //Detects if we are on mobile or PC
-    let ua = window.navigator.userAgent.toLowerCase();
-    isMobile = typeof window.orientation !== "undefined" || ua.indexOf('iemobile') !== -1 || ua.indexOf('mobile') !== -1 || ua.indexOf('android') !== -1;
-
-    worldID = "0001";
+    worldID = roomID;
     worldRecord = client.record.getRecord(`worlds/${worldID}`);
+
+    client.event.subscribe(`moveToRound${worldID}`, moveToRound);
 
     worldRecord.whenReady(function () {
         if (isMobile) {
@@ -37,67 +73,32 @@ function setup() {
 }
 
 function setupController() {
-    stateObjects.roomSelectScene = new PIXI.Container();
-    app.stage.addChild(stateObjects.roomSelectScene);
-    
+    stateObjects.touchX = -1;
+    stateObjects.touchY = -1;
+
+    document.addEventListener("touchstart", function(e){onTouch(e);});
+    document.addEventListener("touchmove", function(e){onTouch(e);});
+    document.addEventListener("touchend", function(e){onTouchEnd(e);});
+
     stateObjects.teamSelectScene = new PIXI.Container();
-    stateObjects.teamSelectScene.visible = false;
+    stateObjects.activeScene = stateObjects.teamSelectScene;
     app.stage.addChild(stateObjects.teamSelectScene);
-    
+
     stateObjects.controllerScene = new PIXI.Container();
+    const moveLeftButton = new TouchButton(10, 10, 80, 80, 0xFF0000, 3, 0xFFFF00, outlineAlpha = 1, onTap = null, onHoverDown = function (e) { client.event.emit(`moveLeft${worldID}`, stateObjects.playerID); });
+    stateObjects.controllerScene.addChild(moveLeftButton);
+
+    const moveRightButton = new TouchButton(100, 10, 80, 80, 0xFF0000, 3, 0xFFFF00, outlineAlpha = 1, onTap = null, onHoverDown = function (e) { client.event.emit(`moveRight${worldID}`, stateObjects.playerID); });
+    stateObjects.controllerScene.addChild(moveRightButton);
+
     stateObjects.controllerScene.visible = false;
     app.stage.addChild(stateObjects.controllerScene);
 
-    worldRecord.whenReady(record => {
+    //Set the game state
+    state = control;
 
-        //Sets up the player ID
-        stateObjects.playerID = -1;
-        client.event.subscribe('getPlayerID', function (id) { stateObjects.playerID = id; client.event.unsubscribe('getPlayerID'); });
-
-        record.whenReady(record => {
-
-            client.event.emit('controllerConnecting');
-
-            // Make a square
-            const moveLeftButton = new PIXI.Graphics();
-            moveLeftButton.beginFill(0xFF0000); 	// red in hexadecimal
-            moveLeftButton.lineStyle(3, 0xFFFF00, 1); // lineWidth,color in hex, alpha
-            moveLeftButton.drawRect(0, 0, 80, 80); 	// x,y,width,height
-            moveLeftButton.endFill();
-            moveLeftButton.x = 10;
-            moveLeftButton.y = 10;
-            moveLeftButton.interactive = true;
-            moveLeftButton.on('touchstart', function (e) {
-                console.log("touch started left");
-                client.event.emit("beginMoveLeft", stateObjects.playerID);
-            });
-            moveLeftButton.on('touchend', function (e) {
-                console.log("touch ended left");
-                client.event.emit("endMove", stateObjects.playerID);
-            });
-            app.stage.addChild(moveLeftButton);  	// now you can see it
-
-            // Make a square
-            const moveRightButton = new PIXI.Graphics();
-            moveRightButton.beginFill(0xFF0000); 	// red in hexadecimal
-            moveRightButton.lineStyle(3, 0xFFFF00, 1); // lineWidth,color in hex, alpha
-            moveRightButton.drawRect(0, 0, 80, 80); 	// x,y,width,height
-            moveRightButton.endFill();
-            moveRightButton.x = 100;
-            moveRightButton.y = 10;
-            moveRightButton.interactive = true;
-            moveRightButton.on('touchstart', function (e) {
-                console.log("touch started right");
-                client.event.emit("beginMoveRight", stateObjects.playerID);
-            });
-            moveRightButton.on('touchend', function (e) {
-                console.log("touch ended right");
-                client.event.emit("endMove", stateObjects.playerID);
-            });
-            app.stage.addChild(moveRightButton);  	// now you can see it
-        });
-    });
-
+    //Start the game loop 
+    app.ticker.add(delta => gameLoop(delta));
 }
 
 function setupDisplay() {
@@ -107,11 +108,22 @@ function setupDisplay() {
     stateObjects.confirm = keyboard("Enter");
     stateObjects.back = keyboard("Escape");
 
-    client.event.subscribe('beginMoveLeft', beginMoveLeft);
-    client.event.subscribe('beginMoveRight', beginMoveRight);
-    client.event.subscribe('endMove', endMove);
+    client.event.subscribe(`moveLeft${worldID}`, moveLeft);
+    client.event.subscribe(`moveRight${worldID}`, moveRight);
 
-    client.event.subscribe('controllerConnecting', playerLogin);
+    client.event.subscribe(`controllerConnecting${worldID}`, playerLogin);
+
+    stateObjects.teamSelectScene = new PIXI.Container();
+    stateObjects.activeScene = stateObjects.teamSelectScene;
+    app.stage.addChild(stateObjects.teamSelectScene);
+
+    stateObjects.gameScene = new PIXI.Container();
+    stateObjects.gameScene.visible = false;
+    app.stage.addChild(stateObjects.gameScene);
+
+    stateObjects.confirm.press = function (e) {
+        client.event.emit(`moveToRound${worldID}`, "");
+    };
 
     //Set the game state
     state = play;
@@ -120,35 +132,75 @@ function setupDisplay() {
     app.ticker.add(delta => gameLoop(delta));
 }
 
+function onTouch(event) {
+    stateObjects.touchX = event.pageX;
+    stateObjects.touchY = event.pageY;
+    console.log(stateObjects.touchX + " | " + stateObjects.touchY)
+}
+
+function onTouchEnd(event) {
+    stateObjects.touchX = -1;
+    stateObjects.touchY = -1;
+}
+
 function gameLoop(delta) {
     //Update the current game state:
     state(delta);
 }
 
 function play(delta) {
-    stateObjects.players.forEach(function (player) { player.move(); });
+    if (stateObjects.activeScene == stateObjects.teamSelectScene) {
+
+    } else if (stateObjects.activeScene == stateObjects.gameScene) {
+        stateObjects.players.forEach(function (player) { player.move(); });
+    }
 }
 
-function beginMoveLeft(value) {
-    stateObjects.players[value].vx = -3;
+function control(delta) {
+    if (stateObjects.activeScene && stateObjects.touchX != -1) {
+        stateObjects.activeScene.children.forEach(function (child) {
+            if (child instanceof TouchButton && child.onHoverDown && child.hoveredOver(stateObjects.touchX, stateObjects.touchY)) {
+                child.onHoverDown();
+            };
+        });
+    }
 }
 
-function beginMoveRight(value) {
-    stateObjects.players[value].vx = 3;
+function moveLeft(value) {
+    stateObjects.players[value].x += -3;
 }
 
-function endMove(value) {
-    stateObjects.players[value].vx = 0;
+function moveRight(value) {
+    stateObjects.players[value].x += 3;
 }
 
 function playerLogin() {
     console.log("Logging in");
-    //make a Player stand-in
-    let player = new Player();
-    app.stage.addChild(player);
-    stateObjects.players.push(player);
-    client.event.emit('getPlayerID', stateObjects.players.length - 1);
-    console.log("Now joining: Player ID " + (stateObjects.players.length - 1));
+    if (stateObjects.activeScene != stateObjects.gameScene) {
+        //make a Player stand-in
+        let player = new Player();
+        stateObjects.gameScene.addChild(player);
+        stateObjects.players.push(player);
+        client.event.emit(`getPlayerID${worldID}`, stateObjects.players.length - 1);
+        console.log("Now joining: Player ID " + (stateObjects.players.length - 1));
+    } else {
+        client.event.emit(`rejectPlayer${worldID}`, "");
+        console.log("Player rejected");
+    }
+}
+
+function moveToRound() {
+    if (isMobile) {
+        stateObjects.teamSelectScene.visible = false;
+        stateObjects.controllerScene.visible = true;
+        stateObjects.activeScene = stateObjects.controllerScene;
+    }
+    else {
+        stateObjects.teamSelectScene.visible = false;
+        stateObjects.gameScene.visible = true;
+        stateObjects.activeScene = stateObjects.gameScene;
+        stateObjects.confirm.press = null;
+    }
 }
 
 //https://github.com/kittykatattack/learningPixi#keyboard
@@ -199,8 +251,8 @@ function keyboard(value) {
     return key;
 }
 
-class Player extends PIXI.Graphics{
-    constructor(color=0xFF0000, radius=20, x=125, y=50){
+class Player extends PIXI.Graphics {
+    constructor(color = 0xFF0000, radius = 20, x = 125, y = 50) {
         super();
         this.beginFill(color);
         this.drawCircle(0, 0, radius);
@@ -211,9 +263,29 @@ class Player extends PIXI.Graphics{
         this.vy = 0;
     }
 
-    move(){
+    move() {
         this.x += this.vx;
         this.y += this.vy;
     }
+}
 
+class TouchButton extends PIXI.Graphics {
+    constructor(x, y, width, height, fillColor, outlineWidth, outlineColor, outlineAlpha = 1, onTap = null, onHoverDown = null) {
+        super();
+        this.beginFill(fillColor);
+        this.lineStyle(outlineWidth, outlineColor, outlineAlpha);
+        this.drawRect(0, 0, width, height);
+        this.endFill();
+        this.x = x;
+        this.y = y;
+        this.interactive = true;
+        this.onHoverDown = onHoverDown;
+        if (onTap) {
+            this.on('tap', onTap);
+        }
+    }
+
+    hoveredOver(x, y) {
+        return (x > this.x && x < this.x + this.width && y > this.y && y < this.y + this.height);
+    }
 }
