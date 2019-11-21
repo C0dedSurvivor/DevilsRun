@@ -80,15 +80,21 @@ function setupController() {
     document.addEventListener("touchmove", function(e){onTouch(e);});
     document.addEventListener("touchend", function(e){onTouchEnd(e);});
 
+    textStyle = {
+        fontFamily : 'Arial',
+        fontSize: 24,
+        fill : "white"
+    }
+
     stateObjects.teamSelectScene = new PIXI.Container();
     stateObjects.activeScene = stateObjects.teamSelectScene;
     app.stage.addChild(stateObjects.teamSelectScene);
 
     stateObjects.controllerScene = new PIXI.Container();
-    const moveLeftButton = new TouchButton(10, 10, 80, 80, 0xFF0000, 3, 0xFFFF00, outlineAlpha = 1, onTap = null, onHoverDown = function (e) { client.event.emit(`moveLeft${worldID}`, stateObjects.playerID); });
+    const moveLeftButton = new TouchButton(10, 10, 80, 80, 0xFF0000, 3, 0xFFFF00, outlineAlpha = 1, "<-", textStyle, onTap = null, onHoverDown = function (e) { client.event.emit(`moveLeft${worldID}`, stateObjects.playerID); });
     stateObjects.controllerScene.addChild(moveLeftButton);
 
-    const moveRightButton = new TouchButton(100, 10, 80, 80, 0xFF0000, 3, 0xFFFF00, outlineAlpha = 1, onTap = null, onHoverDown = function (e) { client.event.emit(`moveRight${worldID}`, stateObjects.playerID); });
+    const moveRightButton = new TouchButton(100, 10, 80, 80, 0xFF0000, 3, 0xFFFF00, outlineAlpha = 1, "->", textStyle, onTap = null, onHoverDown = function (e) { client.event.emit(`moveRight${worldID}`, stateObjects.playerID); });
     stateObjects.controllerScene.addChild(moveRightButton);
 
     stateObjects.controllerScene.visible = false;
@@ -114,6 +120,14 @@ function setupDisplay() {
     client.event.subscribe(`controllerConnecting${worldID}`, playerLogin);
 
     stateObjects.teamSelectScene = new PIXI.Container();
+    let instructions = new PIXI.Text("Press Enter to start the game", {
+        fontFamily : 'Arial',
+        fontSize: 24,
+        fill : "white"
+    });
+    instructions.x = 10;
+    instructions.y = 10;
+    stateObjects.teamSelectScene.addChild(instructions);
     stateObjects.activeScene = stateObjects.teamSelectScene;
     app.stage.addChild(stateObjects.teamSelectScene);
 
@@ -178,7 +192,7 @@ function playerLogin() {
     console.log("Logging in");
     if (stateObjects.activeScene != stateObjects.gameScene) {
         //make a Player stand-in
-        let player = new Player();
+        let player = new Player(stateObjects.players.length);
         stateObjects.gameScene.addChild(player);
         stateObjects.players.push(player);
         client.event.emit(`getPlayerID${worldID}`, stateObjects.players.length - 1);
@@ -252,11 +266,21 @@ function keyboard(value) {
 }
 
 class Player extends PIXI.Graphics {
-    constructor(color = 0xFF0000, radius = 20, x = 125, y = 50) {
+    constructor(id, color = 0xFF0000, radius = 20, x = 125, y = 50) {
         super();
         this.beginFill(color);
         this.drawCircle(0, 0, radius);
         this.endFill();
+        let label = new PIXI.Text(id, {
+            fontFamily : 'Arial',
+            fontSize: 24,
+            fill : "white"
+        });
+        label.style.align = 'center';
+        label.anchor.set(0.5, 0.5);
+        label.x = radius;
+        label.y = radius;
+        this.addChild(label);
         this.x = x;
         this.y = y;
         this.vx = 0;
@@ -270,12 +294,21 @@ class Player extends PIXI.Graphics {
 }
 
 class TouchButton extends PIXI.Graphics {
-    constructor(x, y, width, height, fillColor, outlineWidth, outlineColor, outlineAlpha = 1, onTap = null, onHoverDown = null) {
+    constructor(x, y, width, height, fillColor, outlineWidth, outlineColor, outlineAlpha = 1, text = "", textStyle = null, onTap = null, onHoverDown = null) {
         super();
         this.beginFill(fillColor);
         this.lineStyle(outlineWidth, outlineColor, outlineAlpha);
         this.drawRect(0, 0, width, height);
         this.endFill();
+        if(text){
+            let buttonText = new PIXI.Text(text);
+            textStyle.align = 'center';
+            buttonText.style = textStyle;
+            buttonText.anchor.set(0.5, 0.5);
+            buttonText.x = width/2;
+            buttonText.y = height/2;
+            this.addChild(buttonText);
+        }
         this.x = x;
         this.y = y;
         this.interactive = true;
