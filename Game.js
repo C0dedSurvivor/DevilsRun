@@ -32,18 +32,18 @@ function setup() {
 
 function joinRoom() {
     let room = document.querySelector("#roomselector").value;
-    document.querySelector("#roombutton").interactive = false;
+    document.querySelector("#roombutton").disabled = true;
 
     client.event.subscribe(`getPlayerID${room}`, function (id) {
         stateObjects.playerID = id;
-        generateView(room);
         document.querySelector("main").innerHTML = "";
+        generateView(room);
         client.event.unsubscribe(`getPlayerID${room}`);
         client.event.unsubscribe(`rejectPlayer${room}`);
     });
 
     client.event.subscribe(`rejectPlayer${room}`, function (id) {
-        document.querySelector("#roombutton").interactive = true;
+        document.querySelector("#roombutton").removeAttribute("disabled");
         client.event.unsubscribe(`getPlayerID${room}`);
         client.event.unsubscribe(`rejectPlayer${room}`);
     });
@@ -76,9 +76,10 @@ function setupController() {
     stateObjects.touchX = -1;
     stateObjects.touchY = -1;
 
-    document.addEventListener("touchstart", function(e){onTouch(e);});
-    document.addEventListener("touchmove", function(e){onTouch(e);});
-    document.addEventListener("touchend", function(e){onTouchEnd(e);});
+    app.view.addEventListener("touchstart", function(e){onTouch(e);});
+    app.view.addEventListener("touchmove", function(e){onTouch(e);});
+    app.view.addEventListener("touchend", function(e){onTouchEnd(e);});
+    document.addEventListener("scroll", onScroll);
 
     textStyle = {
         fontFamily : 'Arial',
@@ -147,14 +148,21 @@ function setupDisplay() {
 }
 
 function onTouch(event) {
-    stateObjects.touchX = event.pageX;
-    stateObjects.touchY = event.pageY;
-    console.log(stateObjects.touchX + " | " + stateObjects.touchY)
+    if(event.targetTouches){
+        stateObjects.touchX = event.targetTouches[0].clientX;
+        stateObjects.touchY = event.targetTouches[0].clientY;
+        console.log(stateObjects.touchX + " | " + stateObjects.touchY)
+    }
 }
 
 function onTouchEnd(event) {
     stateObjects.touchX = -1;
     stateObjects.touchY = -1;
+    console.log("Touch ended");
+}
+
+function onScroll(){
+    window.scroll(0,0);
 }
 
 function gameLoop(delta) {
@@ -278,8 +286,6 @@ class Player extends PIXI.Graphics {
         });
         label.style.align = 'center';
         label.anchor.set(0.5, 0.5);
-        label.x = radius;
-        label.y = radius;
         this.addChild(label);
         this.x = x;
         this.y = y;
