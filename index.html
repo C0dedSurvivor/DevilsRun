@@ -13,6 +13,7 @@
 <body>
     <header>
         <script src="https://cdn.deepstream.io/js/client/latest/ds.min.js"></script>
+        <script src="secrets.js"></script>
     </header>
 
     <main>
@@ -20,14 +21,38 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/4.6.0/pixi.min.js"></script>
 
-    <script src="Game.js"></script>
-
     <footer>
         <h4 class="float-left">Copyright 2019</h4>
         <h4 class="float-right">School of Interactive Games and Media<br>
             Rochester Institute of Technology
         </h4>
     </footer>
+
+    <!-- The core Firebase JS SDK is always required and must be listed first -->
+    <script src="https://www.gstatic.com/firebasejs/7.5.0/firebase-app.js"></script>
+
+    <!-- TODO: Add SDKs for Firebase products that you want to use
+     https://firebase.google.com/docs/web/setup#available-libraries -->
+    <script src="https://www.gstatic.com/firebasejs/7.5.0/firebase-firestore.js"></script>
+
+    <script>
+        // Your web app's Firebase configuration
+        var firebaseConfig = {
+            apiKey: Environment.Firebase_API_key,
+            authDomain: Environment.Firebase_authDomain,
+            databaseURL: Environment.Firebase_databaseURL,
+            projectId: Environment.Firebase_projectId,
+            storageBucket: Environment.Firebase_storageBucket,
+            messagingSenderId: Environment.Firebase_messageSenderId,
+            appId: Environment.Firebase_appId
+        };
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+    </script>
+
+    <script src="js/Classes.js"></script>
+    <script src="js/Game.js"></script>
+
 </body>
 
 </html>
