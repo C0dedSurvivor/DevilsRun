@@ -1,8 +1,8 @@
 class Player extends PIXI.Graphics {
-    constructor(id, color = 0xFF0000, radius = 20, x = 125, y = 50) {
+    constructor(id, color = 0xFF0000, x = 125, y = 50) {
         super();
         this.beginFill(color);
-        this.drawCircle(0, 0, radius);
+        this.drawRect(0, 0, 40, 40);
         this.endFill();
         let label = new PIXI.Text(id, {
             fontFamily : 'Arial',
@@ -11,6 +11,8 @@ class Player extends PIXI.Graphics {
         });
         label.style.align = 'center';
         label.anchor.set(0.5, 0.5);
+        label.x = 20;
+        label.y = 20;
         this.addChild(label);
         this.x = x;
         this.y = y;
@@ -18,9 +20,51 @@ class Player extends PIXI.Graphics {
         this.vy = 0;
     }
 
-    move() {
-        this.x += this.vx;
-        this.y += this.vy;
+    move(delta){
+        this.vy += GRAVITY * delta;
+        //If falling
+        if(this.vy > 0){
+            let distToFloor = getClosestFloorDistance(this);
+            if(distToFloor < this.vy * delta){
+                this.vy = 0;
+                this.y += distToFloor;
+            }
+            else{
+                this.y += this.vy * delta;
+            }
+        }
+        //If rising
+        else if(this.vy < 0){
+            let distToCeiling = getClosestCeilingDistance(this);
+            if(distToCeiling > this.vy * delta){
+                this.vy = 0;
+                this.y += distToCeiling;
+            }
+            else{
+                this.y += this.vy * delta;
+            }
+        }
+        
+        //If moving right
+        if(this.vx > 0){
+            let distToRightWall = getClosestRightWallDistance(this);
+            if(distToRightWall < this.vx * delta){
+                this.x += distToRightWall;
+            }
+            else{
+                this.x += this.vx * delta;
+            }
+        }
+        //If moving left
+        else if(this.vx < 0){
+            let distToLeftWall = getClosestLeftWallDistance(this);
+            if(distToLeftWall > this.vx * delta){
+                this.x += distToLeftWall;
+            }
+            else{
+                this.x += this.vx * delta;
+            }
+        }
     }
 }
 
@@ -51,5 +95,19 @@ class TouchButton extends PIXI.Graphics {
 
     hoveredOver(x, y) {
         return (x > this.x && x < this.x + this.width && y > this.y && y < this.y + this.height);
+    }
+}
+
+class Ground extends PIXI.Graphics{
+    constructor(x, y, width, height) {
+        super();
+        this.beginFill(0x753a1a);
+        this.drawRect(0, 0, width, height);
+        this.endFill();
+        this.beginFill(0x1bba06);
+        this.drawRect(0, 0, width, Math.min(height / 4, 10));
+        this.endFill();
+        this.x = x;
+        this.y = y;
     }
 }

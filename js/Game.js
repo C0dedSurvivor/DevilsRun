@@ -3,7 +3,7 @@
 const app = new PIXI.Application(600, 400);
 
 //Sets up the multiplayer connection
-var db = firebase.firestore();
+let db = firebase.firestore();
 
 const client = new DeepstreamClient('wss://devilsrunscribe.csh.rit.edu:9090')
 client.login()
@@ -13,6 +13,8 @@ let stateObjects = {};
 let isMobile, state, worldID;
 
 app.renderer.backgroundColor = 0x42dcff;
+
+const GRAVITY = 1;
 
 //Detects if we are on mobile or PC
 let ua = window.navigator.userAgent.toLowerCase();
@@ -34,14 +36,14 @@ function joinRoom() {
     let room = document.querySelector("#roomselector").value;
     document.querySelector("#roombutton").disabled = true;
 
-    var roomDocRef = db.collection("rooms").doc(room);
+    let roomDocRef = db.collection("rooms").doc(room);
 
     roomDocRef.get().then(function (doc) {
         if (doc.exists) {
             console.log("Document data:", doc.data());
             roomDocRef.collection("data").doc("playerCount").get().then(function (doc) {
                 if (doc.exists) {
-                    var playerCount = doc.data().count;
+                    let playerCount = doc.data().count;
                     if (playerCount <= 7) {
                         roomDocRef.collection("data").doc("playerCount").update({
                             count: firebase.firestore.FieldValue.increment(1)
@@ -67,7 +69,7 @@ function joinRoom() {
                                     throw "Document does not exist!";
                                 }
             
-                                var playerCount = roomDoc.data().count + 1;
+                                let playerCount = roomDoc.data().count + 1;
                                 if (playerCount <= 8) {
                                     transaction.update(roomDocRef.collection("data").doc("playerCount"), { count: playerCount });
                                     return playerCount - 1;
@@ -115,12 +117,12 @@ function generateView(roomID) {
 }
 
 function setupController() {
-    stateObjects.touchX = -1;
-    stateObjects.touchY = -1;
+    stateObjects.currentTouches = [];
 
-    app.view.addEventListener("touchstart", function (e) { onTouch(e); });
-    app.view.addEventListener("touchmove", function (e) { onTouch(e); });
-    app.view.addEventListener("touchend", function (e) { onTouchEnd(e); });
+    app.view.addEventListener("touchstart", onTouchStart, false);
+    app.view.addEventListener("touchmove", onTouchMove, false);
+    app.view.addEventListener("touchend", onTouchEnd, false);
+    app.view.addEventListener("touchcancel", onTouchCancel, false);
     document.addEventListener("scroll", onScroll);
 
     textStyle = {
@@ -130,11 +132,10 @@ function setupController() {
     }
 
     stateObjects.teamSelectScene = new PIXI.Container();
-    stateObjects.activeScene = stateObjects.teamSelectScene;
     app.stage.addChild(stateObjects.teamSelectScene);
 
     stateObjects.controllerScene = new PIXI.Container();
-    const moveLeftButton = new TouchButton(10, 10, 80, 80, 0xFF0000, 3, 0xFFFF00, outlineAlpha = 1, "<-", textStyle, onTap = null);
+    const moveLeftButton = new TouchButton(10, 10, 185, 185, 0xFF0000, 3, 0xFFFF00, outlineAlpha = 1, "<-", textStyle, onTap = null);
     moveLeftButton.onHoverStart = function (e) {
         client.event.emit(`moveLeft${worldID}`, stateObjects.playerID);
     };
@@ -143,7 +144,7 @@ function setupController() {
     };
     stateObjects.controllerScene.addChild(moveLeftButton);
 
-    const moveRightButton = new TouchButton(100, 10, 80, 80, 0xFF0000, 3, 0xFFFF00, outlineAlpha = 1, "->", textStyle, onTap = null);
+    const moveRightButton = new TouchButton(205, 10, 185, 185, 0xFF0000, 3, 0xFFFF00, outlineAlpha = 1, "->", textStyle, onTap = null);
     moveRightButton.onHoverStart = function (e) {
         client.event.emit(`moveRight${worldID}`, stateObjects.playerID);
     };
@@ -151,6 +152,12 @@ function setupController() {
         client.event.emit(`stopMove${worldID}`, stateObjects.playerID);
     };
     stateObjects.controllerScene.addChild(moveRightButton);
+
+    const jumpButton = new TouchButton(10, 205, 380, 185, 0xFF0000, 3, 0xFFFF00, outlineAlpha = 1, "Jump", textStyle, onTap = null);
+    jumpButton.onHoverStart = function (e) {
+        client.event.emit(`jump${worldID}`, stateObjects.playerID);
+    };
+    stateObjects.controllerScene.addChild(jumpButton);
 
     stateObjects.controllerScene.visible = false;
     app.stage.addChild(stateObjects.controllerScene);
@@ -176,6 +183,7 @@ function setupDisplay() {
 
     client.event.subscribe(`moveLeft${worldID}`, moveLeft);
     client.event.subscribe(`moveRight${worldID}`, moveRight);
+    client.event.subscribe(`jump${worldID}`, jump);
     client.event.subscribe(`stopMove${worldID}`, stopMove);
 
     stateObjects.players = [];
@@ -193,10 +201,16 @@ function setupDisplay() {
     instructions.x = 10;
     instructions.y = 10;
     stateObjects.teamSelectScene.addChild(instructions);
-    stateObjects.activeScene = stateObjects.teamSelectScene;
     app.stage.addChild(stateObjects.teamSelectScene);
 
     stateObjects.gameScene = new PIXI.Container();
+    stateObjects.gameScene.addChild(new Ground(0, 300, 200, 100));
+    stateObjects.gameScene.addChild(new Ground(200, 350, 200, 50));
+    stateObjects.gameScene.addChild(new Ground(400, 300, 200, 100));
+    stateObjects.gameScene.addChild(new Ground(200, 150, 200, 50));
+    stateObjects.gameScene.addChild(new Ground(-5, 0, 5, 400));
+    stateObjects.gameScene.addChild(new Ground(600, 0, 5, 400));
+
     app.stage.addChild(stateObjects.gameScene);
 
     stateObjects.confirm.press = function (e) {
@@ -222,29 +236,101 @@ function setupDisplay() {
     app.ticker.add(delta => gameLoop(delta));
 }
 
-function onTouch(event) {
-    if (event.targetTouches) {
-        stateObjects.touchX = event.targetTouches[0].clientX;
-        stateObjects.touchY = event.targetTouches[0].clientY;
+//https://developer.mozilla.org/en-US/docs/Web/API/Touch_events
+function onTouchStart(event) {
+    event.preventDefault();
+    let touches = event.changedTouches;
+    for (let i = 0; i < touches.length; i++) {
+        console.log("touchstart:" + i + "...");
+        stateObjects.currentTouches.push(copyTouch(touches[i]));
     }
+    checkTouchInteractions();
+}
+
+function onTouchMove(event) {
+    event.preventDefault();
+    let touches = event.changedTouches;
+
+    for (let i = 0; i < touches.length; i++) {
+        let idx = ongoingTouchIndexById(touches[i].identifier);
+        if (idx >= 0) {
+            stateObjects.currentTouches.splice(idx, 1, copyTouch(touches[i]));  // swap in the new touch record
+        } else {
+            console.log("can't figure out which touch to continue");
+        }
+    }
+    checkTouchInteractions();
 }
 
 function onTouchEnd(event) {
-    stateObjects.touchX = -1;
-    stateObjects.touchY = -1;
+    event.preventDefault();
+    console.log("touchend");
+    let touches = event.changedTouches;
+
+    for (let i = 0; i < touches.length; i++) {
+        let idx = ongoingTouchIndexById(touches[i].identifier);
+
+        if (idx >= 0) {
+            stateObjects.currentTouches.splice(idx, 1);  // remove it; we're done
+        } else {
+            console.log("can't figure out which touch to end");
+        }
+    }
+    checkTouchInteractions();
+}
+
+function onTouchCancel(event) {
+    event.preventDefault();
+    console.log("touchcancel.");
+    let touches = event.changedTouches;
+
+    for (let i = 0; i < touches.length; i++) {
+        let idx = ongoingTouchIndexById(touches[i].identifier);
+        stateObjects.currentTouches.splice(idx, 1);  // remove it; we're done
+    }
+    checkTouchInteractions();
+}
+
+function copyTouch({ identifier, pageX, pageY }) {
+    return { identifier, pageX, pageY };
+}
+
+function ongoingTouchIndexById(idToFind) {
+    for (let i = 0; i < stateObjects.currentTouches.length; i++) {
+        if (stateObjects.currentTouches[i].identifier == idToFind) {
+            return i;
+        }
+    }
+    return -1;    // not found
+}
+
+function checkTouchInteractions(){
     if (stateObjects.activeScene) {
         stateObjects.activeScene.children.forEach(function (child) {
             if (child instanceof TouchButton) {
                 if (child.hovered) {
-                    if (child.onHoverEnd) {
+                    child.hovered = false;
+                    for (let i = 0; i < stateObjects.currentTouches.length; i++) {
+                        if(child.hoveredOver(stateObjects.currentTouches[i].pageX, stateObjects.currentTouches[i].pageY)){
+                            child.hovered = true;
+                        }
+                    }
+                    if (!child.hovered && child.onHoverEnd) {
                         child.onHoverEnd();
                     }
-                    child.hovered = false;
+                }else{
+                    for (let i = 0; i < stateObjects.currentTouches.length; i++) {
+                        if(child.hoveredOver(stateObjects.currentTouches[i].pageX, stateObjects.currentTouches[i].pageY)){
+                            child.hovered = true;
+                        }
+                    }
+                    if (child.hovered && child.onHoverStart) {
+                        child.onHoverStart();
+                    }
                 }
             }
         });
     }
-    console.log("Touch ended");
 }
 
 function onScroll() {
@@ -260,39 +346,11 @@ function play(delta) {
     if (stateObjects.activeScene == stateObjects.teamSelectScene) {
 
     } else if (stateObjects.activeScene == stateObjects.gameScene) {
-        stateObjects.players.forEach(function (player) { player.move(); });
+        stateObjects.players.forEach(function (player) { player.move(delta); });
     }
 }
 
 function control(delta) {
-    if (stateObjects.activeScene && stateObjects.touchX != -1) {
-        stateObjects.activeScene.children.forEach(function (child) {
-            if (child instanceof TouchButton) {
-                if (child.onHoverStart && !child.hovered && child.hoveredOver(stateObjects.touchX, stateObjects.touchY)) {
-                    child.onHoverStart();
-                    child.hovered = true;
-                }
-                else if (child.hovered && !child.hoveredOver(stateObjects.touchX, stateObjects.touchY)) {
-                    if (child.onHoverEnd) {
-                        child.onHoverEnd();
-                    }
-                    child.hovered = false;
-                }
-            }
-        });
-    }
-}
-
-function moveLeft(value) {
-    stateObjects.players[value].vx = -3;
-}
-
-function moveRight(value) {
-    stateObjects.players[value].vx = 3;
-}
-
-function stopMove(value){
-    stateObjects.players[value].vx = 0;
 }
 
 function playerLogin(id) {
