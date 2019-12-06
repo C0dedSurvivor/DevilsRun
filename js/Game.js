@@ -131,11 +131,54 @@ function setupController() {
         fill: "white"
     }
 
+    stateObjects.team = "Runners";
+
     stateObjects.teamSelectScene = new PIXI.Container();
+
+    let teamInfoText = new PIXI.Text(`Player ID: ${stateObjects.playerID} | Team: Runners`, {
+        fontFamily: 'Arial',
+        fontSize: 24,
+        fill: "black"
+    });
+    teamInfoText.x = 200;
+    teamInfoText.y = 25;
+    teamInfoText.anchor.set(0.5, 0.5);
+    stateObjects.teamSelectScene.addChild(teamInfoText);
+
+    const switchRunnerButton = new TouchButton(10, 50, 185, 185, 0xFF0000, 3, 0xFFFF00, outlineAlpha = 1, "Join Runners", textStyle,
+    function (e) {
+        app.renderer.backgroundColor = 0x42dcff;
+        stateObjects.team = "Runners";
+        teamInfoText.text = `Player ID: ${stateObjects.playerID} | Team: ${stateObjects.team}`;
+        client.event.emit(`switchRunner${worldID}`, stateObjects.playerID);
+    });
+    stateObjects.teamSelectScene.addChild(switchRunnerButton);
+
+    const switchDevilButton = new TouchButton(205, 50, 185, 185, 0xFF0000, 3, 0xFFFF00, outlineAlpha = 1, "Join Devils", textStyle,
+    function (e) {
+        app.renderer.backgroundColor = 0xc71400;
+        stateObjects.team = "Devils";
+        teamInfoText.text = `Player ID: ${stateObjects.playerID} | Team: ${stateObjects.team}`;
+        client.event.emit(`switchDevil${worldID}`, stateObjects.playerID);
+    });
+    stateObjects.teamSelectScene.addChild(switchDevilButton);
+
     app.stage.addChild(stateObjects.teamSelectScene);
 
     stateObjects.controllerScene = new PIXI.Container();
-    const moveLeftButton = new TouchButton(10, 10, 185, 185, 0xFF0000, 3, 0xFFFF00, outlineAlpha = 1, "<-", textStyle, onTap = null);
+    stateObjects.controllerScene.visible = false;
+
+    stateObjects.playerIDText = new PIXI.Text(`Player ID: ${stateObjects.playerID}`, {
+        fontFamily: 'Arial',
+        fontSize: 24,
+        fill: "black"
+    });
+    stateObjects.playerIDText.x = 200;
+    stateObjects.playerIDText.y = 25;
+    stateObjects.playerIDText.anchor.set(0.5, 0.5);
+    stateObjects.controllerScene.addChild(stateObjects.playerIDText);
+
+    const moveLeftButton = new TouchButton(10, 50, 185, 185, 0xFF0000, 3, 0xFFFF00, outlineAlpha = 1, "<-", textStyle);
     moveLeftButton.onHoverStart = function (e) {
         client.event.emit(`moveLeft${worldID}`, stateObjects.playerID);
     };
@@ -144,7 +187,7 @@ function setupController() {
     };
     stateObjects.controllerScene.addChild(moveLeftButton);
 
-    const moveRightButton = new TouchButton(205, 10, 185, 185, 0xFF0000, 3, 0xFFFF00, outlineAlpha = 1, "->", textStyle, onTap = null);
+    const moveRightButton = new TouchButton(205, 50, 185, 185, 0xFF0000, 3, 0xFFFF00, outlineAlpha = 1, "->", textStyle);
     moveRightButton.onHoverStart = function (e) {
         client.event.emit(`moveRight${worldID}`, stateObjects.playerID);
     };
@@ -153,13 +196,6 @@ function setupController() {
     };
     stateObjects.controllerScene.addChild(moveRightButton);
 
-    const jumpButton = new TouchButton(10, 205, 380, 185, 0xFF0000, 3, 0xFFFF00, outlineAlpha = 1, "Jump", textStyle, onTap = null);
-    jumpButton.onHoverStart = function (e) {
-        client.event.emit(`jump${worldID}`, stateObjects.playerID);
-    };
-    stateObjects.controllerScene.addChild(jumpButton);
-
-    stateObjects.controllerScene.visible = false;
     app.stage.addChild(stateObjects.controllerScene);
 
     //Set the game state
@@ -185,22 +221,41 @@ function setupDisplay() {
     client.event.subscribe(`moveRight${worldID}`, moveRight);
     client.event.subscribe(`jump${worldID}`, jump);
     client.event.subscribe(`stopMove${worldID}`, stopMove);
+    client.event.subscribe(`switchRunner${worldID}`, switchRunner);
+    client.event.subscribe(`switchDevil${worldID}`, switchDevil);
 
     stateObjects.players = [];
+    stateObjects.playerTeams = [];
 
     //Capture the keyboard arrow keys
     stateObjects.confirm = keyboard("Enter");
     stateObjects.back = keyboard("Escape");
 
-    stateObjects.teamSelectScene = new PIXI.Container();
-    let instructions = new PIXI.Text("Press Enter to start the game", {
+    let textStyle = {
         fontFamily: 'Arial',
         fontSize: 24,
-        fill: "white"
-    });
-    instructions.x = 10;
-    instructions.y = 10;
+        fill: "white",
+        align: "center"
+    }
+
+    stateObjects.teamSelectScene = new PIXI.Container();
+    let instructions = new PIXI.Text("Press Enter to start the game", textStyle);
+    instructions.x = 300;
+    instructions.y = 200;
+    instructions.anchor.set(0.5, 0.5);
     stateObjects.teamSelectScene.addChild(instructions);
+
+    stateObjects.playerCountText = new PIXI.Text("Number of players: 0", textStyle);
+    stateObjects.playerCountText.x = 300;
+    stateObjects.playerCountText.y = 100;
+    stateObjects.playerCountText.anchor.set(0.5, 0.5);
+    stateObjects.teamSelectScene.addChild(stateObjects.playerCountText);
+
+    stateObjects.playerTeamText = new PIXI.Text("Runners: None\nDevils: None", textStyle);
+    stateObjects.playerTeamText.x = 300;
+    stateObjects.playerTeamText.y = 150;
+    stateObjects.playerTeamText.anchor.set(0.5, 0.5);
+    stateObjects.teamSelectScene.addChild(stateObjects.playerTeamText);
     app.stage.addChild(stateObjects.teamSelectScene);
 
     stateObjects.gameScene = new PIXI.Container();
@@ -333,6 +388,31 @@ function checkTouchInteractions(){
     }
 }
 
+function switchRunner(id){
+    stateObjects.playerTeams[id] = "Runners";
+    updateTeamText();
+}
+
+function switchDevil(id){
+    stateObjects.playerTeams[id] = "Devils";
+    updateTeamText();
+}
+
+function updateTeamText(){
+    let runnerText = "Runners:";
+    let devilText = "Devils:";
+    for(let i = 0; i < stateObjects.playerTeams.length; i++){
+        if(stateObjects.playerTeams[i] == "Runners"){
+            runnerText += ` ${i}`;
+        }else{
+            devilText += ` ${i}`;
+        }
+    }
+    if(runnerText == "Runners:") { runnerText += " None"; }
+    if(devilText == "Devils:") { devilText += " None"; }
+    stateObjects.playerTeamText.text = `${runnerText}\n${devilText}`;
+}
+
 function onScroll() {
     window.scroll(0, 0);
 }
@@ -355,15 +435,12 @@ function control(delta) {
 
 function playerLogin(id) {
     //Stops a player from being generated the first time the script connects to the db
-    if (id == stateObjects.players.length) {
-        console.log("Logging in");
-        //make a Player stand-in
-        let player = new Player(id);
-        stateObjects.gameScene.addChild(player);
-        stateObjects.players.push(player);
-        console.log("Now joining: Player ID " + id);
+    if (id == stateObjects.playerTeams.length) {
+        console.log("Logging in: Player ID " + id);
+        switchRunner(id);
+        stateObjects.playerCountText.text = `Number of players: ${stateObjects.playerTeams.length}`;
     } else {
-        console.log("Denied false login: " + id + "|" + stateObjects.players.length);
+        console.log("Denied false login: " + id + "|" + stateObjects.playerTeams.length);
     }
 }
 
@@ -383,8 +460,32 @@ function switchState(newState) {
         if (isMobile) {
             stateObjects.controllerScene.visible = true;
             stateObjects.activeScene = stateObjects.controllerScene;
+            if(stateObjects.team == "Runners"){
+                //Adds the jump button to the controller
+                const jumpButton = new TouchButton(10, 245, 380, 150, 0xFF0000, 3, 0xFFFF00, outlineAlpha = 1, "Jump", {
+                    fontFamily: 'Arial',
+                    fontSize: 24,
+                    fill: "black"
+                });
+                jumpButton.onHoverStart = function (e) {
+                    client.event.emit(`jump${worldID}`, stateObjects.playerID);
+                };
+                stateObjects.controllerScene.addChild(jumpButton);
+            }else{
+            }
         }
         else {
+            for(let i = 0; i < stateObjects.playerTeams.length; i++){
+                //make a Player stand-in
+                let player;
+                if(stateObjects.playerTeams[i] == "Runners"){
+                    player = new Player(i);
+                }else{
+                    player = new Devil(i);
+                }
+                stateObjects.gameScene.addChild(player);
+                stateObjects.players.push(player);
+            }
             stateObjects.gameScene.visible = true;
             stateObjects.activeScene = stateObjects.gameScene;
             stateObjects.confirm.press = null;

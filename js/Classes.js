@@ -1,27 +1,12 @@
-class Player extends PIXI.Graphics {
-    constructor(id, color = 0xFF0000, x = 125, y = 50) {
+class Mover extends PIXI.Graphics {
+    constructor() {
         super();
-        this.beginFill(color);
-        this.drawRect(0, 0, 40, 40);
-        this.endFill();
-        let label = new PIXI.Text(id, {
-            fontFamily : 'Arial',
-            fontSize: 24,
-            fill : "white"
-        });
-        label.style.align = 'center';
-        label.anchor.set(0.5, 0.5);
-        label.x = 20;
-        label.y = 20;
-        this.addChild(label);
-        this.x = x;
-        this.y = y;
         this.vx = 0;
         this.vy = 0;
     }
 
     move(delta){
-        this.vy += GRAVITY * delta;
+        this.vy += this.ay * delta;
         //If falling
         if(this.vy > 0){
             let distToFloor = getClosestFloorDistance(this);
@@ -65,6 +50,48 @@ class Player extends PIXI.Graphics {
                 this.x += this.vx * delta;
             }
         }
+    }
+}
+
+class Player extends Mover {
+    constructor(id, color = 0xFF00FF, x = 125, y = 60) {
+        super();
+        this.beginFill(color);
+        this.drawRect(0, 0, 40, 40);
+        this.endFill();
+        let label = new PIXI.Text(id, {
+            fontFamily : 'Arial',
+            fontSize: 24,
+            fill : "white"
+        });
+        label.style.align = 'center';
+        label.anchor.set(0.5, 0.5);
+        label.x = 20;
+        label.y = 20;
+        this.addChild(label);
+        this.x = x;
+        this.y = y;
+        this.ay = GRAVITY;
+    }
+}
+
+class Devil extends Mover {
+    constructor(id, color = 0xFF0000, x = 125, y = 40) {
+        super();
+        this.beginFill(color);
+        this.drawCircle(0, 0, 20);
+        this.endFill();
+        let label = new PIXI.Text(id, {
+            fontFamily : 'Arial',
+            fontSize: 24,
+            fill : "white"
+        });
+        label.style.align = 'center';
+        label.anchor.set(0.5, 0.5);
+        this.addChild(label);
+        this.x = x;
+        this.y = y;
+        this.ay = 0;
     }
 }
 

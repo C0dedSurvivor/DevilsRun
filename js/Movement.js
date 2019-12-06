@@ -31,7 +31,7 @@ function getClosestCeilingDistance(player){
         let minDistance = Number.MIN_SAFE_INTEGER;
         stateObjects.activeScene.children.forEach(function (child) {
             //If the player is in the same column as this section of ground
-            if (child instanceof Ground && intersection(player.x, player.x + player.width, child.x + 1, child.x + child.width - 1)) {
+            if (child instanceof Ground && intersection(player.x, player.x + player.width, child.x, child.x + child.width)) {
                 let distance = child.y + child.height - player.y;
                 if(distance <= 0 && distance > minDistance){
                     minDistance = distance;
@@ -50,7 +50,7 @@ function getClosestFloorDistance(player){
         let minDistance = Number.MAX_SAFE_INTEGER;
         stateObjects.activeScene.children.forEach(function (child) {
             //If the player is in the same column as this section of ground
-            if (child instanceof Ground && intersection(player.x, player.x + player.width, child.x + 1, child.x + child.width - 1)) {
+            if (child instanceof Ground && intersection(player.x, player.x + player.width, child.x, child.x + child.width)) {
                 let distance = child.y - (player.y + player.height);
                 if(distance >= 0 && distance < minDistance){
                     minDistance = distance;
@@ -69,7 +69,7 @@ function getClosestLeftWallDistance(player){
         let minDistance = Number.MIN_SAFE_INTEGER;
         stateObjects.activeScene.children.forEach(function (child) {
             //If the player is in the same column as this section of ground
-            if (child instanceof Ground && intersection(player.y, player.y + player.height, child.y + 1, child.y + child.height - 1)) {
+            if (child instanceof Ground && intersection(player.y, player.y + player.height, child.y, child.y + child.height)) {
                 let distance = child.x + child.width - player.x;
                 if(distance <= 0 && distance > minDistance){
                     minDistance = distance;
@@ -88,7 +88,7 @@ function getClosestRightWallDistance(player){
         let minDistance = Number.MAX_SAFE_INTEGER;
         stateObjects.activeScene.children.forEach(function (child) {
             //If the player is in the same column as this section of ground
-            if (child instanceof Ground && intersection(player.y, player.y + player.height, child.y + 1, child.y + child.height - 1)) {
+            if (child instanceof Ground && intersection(player.y, player.y + player.height, child.y, child.y + child.height)) {
                 let distance = child.x - (player.x + player.width);
                 if(distance >= 0 && distance < minDistance){
                     minDistance = distance;
