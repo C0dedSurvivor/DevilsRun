@@ -5,48 +5,48 @@ class Mover extends PIXI.Graphics {
         this.vy = 0;
     }
 
-    move(delta){
+    move(delta) {
         this.vy += this.ay * delta;
         //If falling
-        if(this.vy > 0){
+        if (this.vy > 0) {
             let distToFloor = getClosestFloorDistance(this);
-            if(distToFloor < this.vy * delta){
+            if (distToFloor < this.vy * delta) {
                 this.vy = 0;
                 this.y += distToFloor;
             }
-            else{
+            else {
                 this.y += this.vy * delta;
             }
         }
         //If rising
-        else if(this.vy < 0){
+        else if (this.vy < 0) {
             let distToCeiling = getClosestCeilingDistance(this);
-            if(distToCeiling > this.vy * delta){
+            if (distToCeiling > this.vy * delta) {
                 this.vy = 0;
                 this.y += distToCeiling;
             }
-            else{
+            else {
                 this.y += this.vy * delta;
             }
         }
-        
+
         //If moving right
-        if(this.vx > 0){
+        if (this.vx > 0) {
             let distToRightWall = getClosestRightWallDistance(this);
-            if(distToRightWall < this.vx * delta){
+            if (distToRightWall < this.vx * delta) {
                 this.x += distToRightWall;
             }
-            else{
+            else {
                 this.x += this.vx * delta;
             }
         }
         //If moving left
-        else if(this.vx < 0){
+        else if (this.vx < 0) {
             let distToLeftWall = getClosestLeftWallDistance(this);
-            if(distToLeftWall > this.vx * delta){
+            if (distToLeftWall > this.vx * delta) {
                 this.x += distToLeftWall;
             }
-            else{
+            else {
                 this.x += this.vx * delta;
             }
         }
@@ -60,9 +60,9 @@ class Player extends Mover {
         this.drawRect(0, 0, 40, 40);
         this.endFill();
         let label = new PIXI.Text(id, {
-            fontFamily : 'Arial',
+            fontFamily: 'Arial',
             fontSize: 24,
-            fill : "white"
+            fill: "white"
         });
         label.style.align = 'center';
         label.anchor.set(0.5, 0.5);
@@ -72,6 +72,7 @@ class Player extends Mover {
         this.x = x;
         this.y = y;
         this.ay = GRAVITY;
+        this.health = 100;
     }
 }
 
@@ -82,9 +83,9 @@ class Devil extends Mover {
         this.drawCircle(0, 0, 20);
         this.endFill();
         let label = new PIXI.Text(id, {
-            fontFamily : 'Arial',
+            fontFamily: 'Arial',
             fontSize: 24,
-            fill : "white"
+            fill: "white"
         });
         label.style.align = 'center';
         label.anchor.set(0.5, 0.5);
@@ -102,13 +103,13 @@ class TouchButton extends PIXI.Graphics {
         this.lineStyle(outlineWidth, outlineColor, outlineAlpha);
         this.drawRect(0, 0, width, height);
         this.endFill();
-        if(text){
+        if (text) {
             let buttonText = new PIXI.Text(text);
             textStyle.align = 'center';
             buttonText.style = textStyle;
             buttonText.anchor.set(0.5, 0.5);
-            buttonText.x = width/2;
-            buttonText.y = height/2;
+            buttonText.x = width / 2;
+            buttonText.y = height / 2;
             this.addChild(buttonText);
         }
         this.x = x;
@@ -125,7 +126,7 @@ class TouchButton extends PIXI.Graphics {
     }
 }
 
-class Ground extends PIXI.Graphics{
+class Ground extends PIXI.Graphics {
     constructor(x, y, width, height) {
         super();
         this.beginFill(0x753a1a);
@@ -134,6 +135,43 @@ class Ground extends PIXI.Graphics{
         this.beginFill(0x1bba06);
         this.drawRect(0, 0, width, Math.min(height / 4, 10));
         this.endFill();
+        this.x = x;
+        this.y = y;
+    }
+}
+
+class Laser extends PIXI.Graphics {
+    constructor(x, y, width, height, timer) {
+        super();
+        this.beginFill(0xf7f719);
+        this.drawRect(0, 0, width, height);
+        this.endFill();
+        this.x = x;
+        this.y = y;
+        this.timer = timer;
+    }
+
+    update(delta) {
+        this.timer -= delta;
+    }
+}
+
+class CollisionPoly {
+    constructor(vertexList){
+        this.vertexList = vertexList;
+    }
+}
+
+class CollisionCircle {
+    constructor(x, y, radius){
+        this.x = x;
+        this.y = y;
+        this.radius = radius;
+    }
+}
+
+class Vector2{
+    constructor(x, y){
         this.x = x;
         this.y = y;
     }

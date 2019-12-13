@@ -146,21 +146,21 @@ function setupController() {
     stateObjects.teamSelectScene.addChild(teamInfoText);
 
     const switchRunnerButton = new TouchButton(10, 50, 185, 185, 0xFF0000, 3, 0xFFFF00, outlineAlpha = 1, "Join Runners", textStyle,
-    function (e) {
-        app.renderer.backgroundColor = 0x42dcff;
-        stateObjects.team = "Runners";
-        teamInfoText.text = `Player ID: ${stateObjects.playerID} | Team: ${stateObjects.team}`;
-        client.event.emit(`switchRunner${worldID}`, stateObjects.playerID);
-    });
+        function (e) {
+            app.renderer.backgroundColor = 0x42dcff;
+            stateObjects.team = "Runners";
+            teamInfoText.text = `Player ID: ${stateObjects.playerID} | Team: ${stateObjects.team}`;
+            client.event.emit(`switchRunner${worldID}`, stateObjects.playerID);
+        });
     stateObjects.teamSelectScene.addChild(switchRunnerButton);
 
     const switchDevilButton = new TouchButton(205, 50, 185, 185, 0xFF0000, 3, 0xFFFF00, outlineAlpha = 1, "Join Devils", textStyle,
-    function (e) {
-        app.renderer.backgroundColor = 0xc71400;
-        stateObjects.team = "Devils";
-        teamInfoText.text = `Player ID: ${stateObjects.playerID} | Team: ${stateObjects.team}`;
-        client.event.emit(`switchDevil${worldID}`, stateObjects.playerID);
-    });
+        function (e) {
+            app.renderer.backgroundColor = 0xc71400;
+            stateObjects.team = "Devils";
+            teamInfoText.text = `Player ID: ${stateObjects.playerID} | Team: ${stateObjects.team}`;
+            client.event.emit(`switchDevil${worldID}`, stateObjects.playerID);
+        });
     stateObjects.teamSelectScene.addChild(switchDevilButton);
 
     app.stage.addChild(stateObjects.teamSelectScene);
@@ -220,12 +220,14 @@ function setupDisplay() {
     client.event.subscribe(`moveLeft${worldID}`, moveLeft);
     client.event.subscribe(`moveRight${worldID}`, moveRight);
     client.event.subscribe(`jump${worldID}`, jump);
+    client.event.subscribe(`laser${worldID}`, shootLaser);
     client.event.subscribe(`stopMove${worldID}`, stopMove);
     client.event.subscribe(`switchRunner${worldID}`, switchRunner);
     client.event.subscribe(`switchDevil${worldID}`, switchDevil);
 
     stateObjects.players = [];
     stateObjects.playerTeams = [];
+    stateObjects.attacks = [];
 
     //Capture the keyboard arrow keys
     stateObjects.confirm = keyboard("Enter");
@@ -234,16 +236,11 @@ function setupDisplay() {
     let textStyle = {
         fontFamily: 'Arial',
         fontSize: 24,
-        fill: "white",
+        fill: "black",
         align: "center"
     }
 
     stateObjects.teamSelectScene = new PIXI.Container();
-    let instructions = new PIXI.Text("Press Enter to start the game", textStyle);
-    instructions.x = 300;
-    instructions.y = 200;
-    instructions.anchor.set(0.5, 0.5);
-    stateObjects.teamSelectScene.addChild(instructions);
 
     stateObjects.playerCountText = new PIXI.Text("Number of players: 0", textStyle);
     stateObjects.playerCountText.x = 300;
@@ -253,10 +250,21 @@ function setupDisplay() {
 
     stateObjects.playerTeamText = new PIXI.Text("Runners: None\nDevils: None", textStyle);
     stateObjects.playerTeamText.x = 300;
-    stateObjects.playerTeamText.y = 150;
+    stateObjects.playerTeamText.y = 160;
     stateObjects.playerTeamText.anchor.set(0.5, 0.5);
     stateObjects.teamSelectScene.addChild(stateObjects.playerTeamText);
     app.stage.addChild(stateObjects.teamSelectScene);
+
+    let instructions = new PIXI.Text(`Connect on your phone by going to\nhttps://people.rit.edu/jbb7824/DevilsRunTest\nand using room code ${worldID}.\n When everyone has joined, press Enter to start the game`, {
+        fontFamily: 'Arial',
+        fontSize: 18,
+        fill: "black",
+        align: "center"
+    });
+    instructions.x = 300;
+    instructions.y = 240;
+    instructions.anchor.set(0.5, 0.5);
+    stateObjects.teamSelectScene.addChild(instructions);
 
     stateObjects.gameScene = new PIXI.Container();
     stateObjects.gameScene.addChild(new Ground(0, 300, 200, 100));
@@ -291,125 +299,28 @@ function setupDisplay() {
     app.ticker.add(delta => gameLoop(delta));
 }
 
-//https://developer.mozilla.org/en-US/docs/Web/API/Touch_events
-function onTouchStart(event) {
-    event.preventDefault();
-    let touches = event.changedTouches;
-    for (let i = 0; i < touches.length; i++) {
-        console.log("touchstart:" + i + "...");
-        stateObjects.currentTouches.push(copyTouch(touches[i]));
-    }
-    checkTouchInteractions();
-}
-
-function onTouchMove(event) {
-    event.preventDefault();
-    let touches = event.changedTouches;
-
-    for (let i = 0; i < touches.length; i++) {
-        let idx = ongoingTouchIndexById(touches[i].identifier);
-        if (idx >= 0) {
-            stateObjects.currentTouches.splice(idx, 1, copyTouch(touches[i]));  // swap in the new touch record
-        } else {
-            console.log("can't figure out which touch to continue");
-        }
-    }
-    checkTouchInteractions();
-}
-
-function onTouchEnd(event) {
-    event.preventDefault();
-    console.log("touchend");
-    let touches = event.changedTouches;
-
-    for (let i = 0; i < touches.length; i++) {
-        let idx = ongoingTouchIndexById(touches[i].identifier);
-
-        if (idx >= 0) {
-            stateObjects.currentTouches.splice(idx, 1);  // remove it; we're done
-        } else {
-            console.log("can't figure out which touch to end");
-        }
-    }
-    checkTouchInteractions();
-}
-
-function onTouchCancel(event) {
-    event.preventDefault();
-    console.log("touchcancel.");
-    let touches = event.changedTouches;
-
-    for (let i = 0; i < touches.length; i++) {
-        let idx = ongoingTouchIndexById(touches[i].identifier);
-        stateObjects.currentTouches.splice(idx, 1);  // remove it; we're done
-    }
-    checkTouchInteractions();
-}
-
-function copyTouch({ identifier, pageX, pageY }) {
-    return { identifier, pageX, pageY };
-}
-
-function ongoingTouchIndexById(idToFind) {
-    for (let i = 0; i < stateObjects.currentTouches.length; i++) {
-        if (stateObjects.currentTouches[i].identifier == idToFind) {
-            return i;
-        }
-    }
-    return -1;    // not found
-}
-
-function checkTouchInteractions(){
-    if (stateObjects.activeScene) {
-        stateObjects.activeScene.children.forEach(function (child) {
-            if (child instanceof TouchButton) {
-                if (child.hovered) {
-                    child.hovered = false;
-                    for (let i = 0; i < stateObjects.currentTouches.length; i++) {
-                        if(child.hoveredOver(stateObjects.currentTouches[i].pageX, stateObjects.currentTouches[i].pageY)){
-                            child.hovered = true;
-                        }
-                    }
-                    if (!child.hovered && child.onHoverEnd) {
-                        child.onHoverEnd();
-                    }
-                }else{
-                    for (let i = 0; i < stateObjects.currentTouches.length; i++) {
-                        if(child.hoveredOver(stateObjects.currentTouches[i].pageX, stateObjects.currentTouches[i].pageY)){
-                            child.hovered = true;
-                        }
-                    }
-                    if (child.hovered && child.onHoverStart) {
-                        child.onHoverStart();
-                    }
-                }
-            }
-        });
-    }
-}
-
-function switchRunner(id){
+function switchRunner(id) {
     stateObjects.playerTeams[id] = "Runners";
     updateTeamText();
 }
 
-function switchDevil(id){
+function switchDevil(id) {
     stateObjects.playerTeams[id] = "Devils";
     updateTeamText();
 }
 
-function updateTeamText(){
+function updateTeamText() {
     let runnerText = "Runners:";
     let devilText = "Devils:";
-    for(let i = 0; i < stateObjects.playerTeams.length; i++){
-        if(stateObjects.playerTeams[i] == "Runners"){
+    for (let i = 0; i < stateObjects.playerTeams.length; i++) {
+        if (stateObjects.playerTeams[i] == "Runners") {
             runnerText += ` ${i}`;
-        }else{
+        } else {
             devilText += ` ${i}`;
         }
     }
-    if(runnerText == "Runners:") { runnerText += " None"; }
-    if(devilText == "Devils:") { devilText += " None"; }
+    if (runnerText == "Runners:") { runnerText += " None"; }
+    if (devilText == "Devils:") { devilText += " None"; }
     stateObjects.playerTeamText.text = `${runnerText}\n${devilText}`;
 }
 
@@ -427,10 +338,24 @@ function play(delta) {
 
     } else if (stateObjects.activeScene == stateObjects.gameScene) {
         stateObjects.players.forEach(function (player) { player.move(delta); });
+        for (let i = 0; i < stateObjects.attacks.length; i++) {
+            stateObjects.attacks[i].update(delta);
+            if (stateObjects.attacks[i].timer <= 0) {
+                stateObjects.activeScene.removeChild(stateObjects.attacks[i]);
+                stateObjects.attacks.splice(i, 1);
+                i--;
+            }
+        }
     }
 }
 
 function control(delta) {
+}
+
+function shootLaser(id) {
+    stateObjects.attacks.push(new Laser(stateObjects.players[id].x + stateObjects.players[id].width / 4, stateObjects.players[id].y + stateObjects.players[id].height / 2,
+        stateObjects.players[id].width / 2, 400, 10));
+    stateObjects.activeScene.addChild(stateObjects.attacks[stateObjects.attacks.length - 1]);
 }
 
 function playerLogin(id) {
@@ -460,7 +385,7 @@ function switchState(newState) {
         if (isMobile) {
             stateObjects.controllerScene.visible = true;
             stateObjects.activeScene = stateObjects.controllerScene;
-            if(stateObjects.team == "Runners"){
+            if (stateObjects.team == "Runners") {
                 //Adds the jump button to the controller
                 const jumpButton = new TouchButton(10, 245, 380, 150, 0xFF0000, 3, 0xFFFF00, outlineAlpha = 1, "Jump", {
                     fontFamily: 'Arial',
@@ -471,16 +396,26 @@ function switchState(newState) {
                     client.event.emit(`jump${worldID}`, stateObjects.playerID);
                 };
                 stateObjects.controllerScene.addChild(jumpButton);
-            }else{
+            } else {
+                //Adds the laser button to the controller
+                const laserButton = new TouchButton(10, 245, 380, 150, 0xFF0000, 3, 0xFFFF00, outlineAlpha = 1, "Laser", {
+                    fontFamily: 'Arial',
+                    fontSize: 24,
+                    fill: "black"
+                });
+                laserButton.onHoverStart = function (e) {
+                    client.event.emit(`laser${worldID}`, stateObjects.playerID);
+                };
+                stateObjects.controllerScene.addChild(laserButton);
             }
         }
         else {
-            for(let i = 0; i < stateObjects.playerTeams.length; i++){
+            for (let i = 0; i < stateObjects.playerTeams.length; i++) {
                 //make a Player stand-in
                 let player;
-                if(stateObjects.playerTeams[i] == "Runners"){
+                if (stateObjects.playerTeams[i] == "Runners") {
                     player = new Player(i);
-                }else{
+                } else {
                     player = new Devil(i);
                 }
                 stateObjects.gameScene.addChild(player);
@@ -491,52 +426,4 @@ function switchState(newState) {
             stateObjects.confirm.press = null;
         }
     }
-}
-
-//https://github.com/kittykatattack/learningPixi#keyboard
-function keyboard(value) {
-    let key = {};
-    key.value = value;
-    key.isDown = false;
-    key.isUp = true;
-    key.press = undefined;
-    key.release = undefined;
-    //The `downHandler`
-    key.downHandler = event => {
-        if (event.key === key.value) {
-            if (key.isUp && key.press) key.press();
-            key.isDown = true;
-            key.isUp = false;
-            event.preventDefault();
-        }
-    };
-
-    //The `upHandler`
-    key.upHandler = event => {
-        if (event.key === key.value) {
-            if (key.isDown && key.release) key.release();
-            key.isDown = false;
-            key.isUp = true;
-            event.preventDefault();
-        }
-    };
-
-    //Attach event listeners
-    const downListener = key.downHandler.bind(key);
-    const upListener = key.upHandler.bind(key);
-
-    window.addEventListener(
-        "keydown", downListener, false
-    );
-    window.addEventListener(
-        "keyup", upListener, false
-    );
-
-    // Detach event listeners
-    key.unsubscribe = () => {
-        window.removeEventListener("keydown", downListener);
-        window.removeEventListener("keyup", upListener);
-    };
-
-    return key;
 }
