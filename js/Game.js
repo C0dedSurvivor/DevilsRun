@@ -1,6 +1,9 @@
-// #1 - Create a new Pixi application
+const windowWidth = 600;
+const windowHeight = 400;
+
+// Create a new Pixi application
 // http://pixijs.download/dev/docs/PIXI.Application.html
-const app = new PIXI.Application(600, 400);
+const app = new PIXI.Application(windowWidth, windowHeight);
 
 //Sets up the multiplayer connection
 let db = firebase.firestore();
@@ -207,6 +210,7 @@ function setupDisplay() {
 
     stateObjects.players = [];
     stateObjects.playerTeams = [];
+    stateObjects.attackWindups = [];
     stateObjects.attacks = [];
 
     //Capture the keyboard arrow keys
@@ -223,13 +227,13 @@ function setupDisplay() {
     stateObjects.teamSelectScene = new PIXI.Container();
 
     stateObjects.playerCountText = new PIXI.Text("Number of players: 0", textStyle);
-    stateObjects.playerCountText.x = 300;
+    stateObjects.playerCountText.x = windowWidth / 2;
     stateObjects.playerCountText.y = 100;
     stateObjects.playerCountText.anchor.set(0.5, 0.5);
     stateObjects.teamSelectScene.addChild(stateObjects.playerCountText);
 
     stateObjects.playerTeamText = new PIXI.Text("Runners: None\nDevils: None", textStyle);
-    stateObjects.playerTeamText.x = 300;
+    stateObjects.playerTeamText.x = windowWidth / 2;
     stateObjects.playerTeamText.y = 160;
     stateObjects.playerTeamText.anchor.set(0.5, 0.5);
     stateObjects.teamSelectScene.addChild(stateObjects.playerTeamText);
@@ -241,18 +245,18 @@ function setupDisplay() {
         fill: "black",
         align: "center"
     });
-    instructions.x = 300;
+    instructions.x = windowWidth / 2;
     instructions.y = 240;
     instructions.anchor.set(0.5, 0.5);
     stateObjects.teamSelectScene.addChild(instructions);
 
     stateObjects.gameScene = new PIXI.Container();
-    stateObjects.gameScene.addChild(new Ground(0, 300, 200, 100));
-    stateObjects.gameScene.addChild(new Ground(200, 350, 200, 50));
-    stateObjects.gameScene.addChild(new Ground(400, 300, 200, 100));
-    stateObjects.gameScene.addChild(new Ground(200, 150, 200, 50));
-    stateObjects.gameScene.addChild(new Ground(-5, 0, 5, 400));
-    stateObjects.gameScene.addChild(new Ground(600, 0, 5, 400));
+    stateObjects.gameScene.addChild(new Ground(0, windowHeight * 0.75, windowWidth / 3, 100));
+    stateObjects.gameScene.addChild(new Ground(windowWidth / 3, 350, windowWidth / 3, 50));
+    stateObjects.gameScene.addChild(new Ground(2 * windowWidth / 3, windowHeight * 0.75, windowWidth / 3, 100));
+    stateObjects.gameScene.addChild(new Ground(windowWidth / 3, 150, windowWidth / 3, 50));
+    stateObjects.gameScene.addChild(new Ground(-5, 0, 5, windowHeight));
+    stateObjects.gameScene.addChild(new Ground(windowWidth, 0, 5, windowHeight));
 
     app.stage.addChild(stateObjects.gameScene);
 
@@ -318,6 +322,16 @@ function play(delta) {
 
     } else if (stateObjects.activeScene == stateObjects.gameScene) {
         stateObjects.players.forEach(function (player) { player.move(delta); });
+        for (let i = 0; i < stateObjects.attackWindups.length; i++) {
+            stateObjects.attackWindups[i].update(delta);
+            if (stateObjects.attackWindups[i].timer <= 0) {
+                stateObjects.attacks.push(new Laser(stateObjects.attackWindups[i].points, stateObjects.attackWindups[i].fullTimer));
+                stateObjects.activeScene.addChild(stateObjects.attacks[stateObjects.attacks.length - 1]);
+                stateObjects.activeScene.removeChild(stateObjects.attackWindups[i]);
+                stateObjects.attackWindups.splice(i, 1);
+                i--;
+            }
+        }
         for (let i = 0; i < stateObjects.attacks.length; i++) {
             stateObjects.attacks[i].update(delta);
             if (stateObjects.attacks[i].timer <= 0) {
@@ -348,33 +362,33 @@ function control(delta) {
 }
 
 function shootLeftLaser(id) {
-    stateObjects.attacks.push(new Laser([
-        new PIXI.Point(stateObjects.players[id].x + stateObjects.players[id].width / 4, stateObjects.players[id].y + stateObjects.players[id].height / 2),
-        new PIXI.Point(stateObjects.players[id].x + stateObjects.players[id].width * 0.75, stateObjects.players[id].y + stateObjects.players[id].height / 2),
-        new PIXI.Point(stateObjects.players[id].x + stateObjects.players[id].width * 0.75 - 150, stateObjects.players[id].y + stateObjects.players[id].height / 2 + 400),
-        new PIXI.Point(stateObjects.players[id].x + stateObjects.players[id].width / 4 - 150, stateObjects.players[id].y + stateObjects.players[id].height / 2 + 400)]
-        , 10));
-    stateObjects.activeScene.addChild(stateObjects.attacks[stateObjects.attacks.length - 1]);
+    stateObjects.attackWindups.push(new Laser([
+        new PIXI.Point(stateObjects.players[id].x, stateObjects.players[id].y + stateObjects.players[id].height),
+        new PIXI.Point(stateObjects.players[id].x + stateObjects.players[id].width / 2, stateObjects.players[id].y + stateObjects.players[id].height),
+        new PIXI.Point(stateObjects.players[id].x + stateObjects.players[id].width / 2 - 150, stateObjects.players[id].y + stateObjects.players[id].height + windowHeight),
+        new PIXI.Point(stateObjects.players[id].x - 150, stateObjects.players[id].y + stateObjects.players[id].height + windowHeight)]
+        , 10, 0.5));
+    stateObjects.activeScene.addChild(stateObjects.attackWindups[stateObjects.attackWindups.length - 1]);
 }
 
 function shootDownwardLaser(id) {
-    stateObjects.attacks.push(new Laser([
-        new PIXI.Point(stateObjects.players[id].x + stateObjects.players[id].width / 4, stateObjects.players[id].y + stateObjects.players[id].height / 2),
-        new PIXI.Point(stateObjects.players[id].x + stateObjects.players[id].width * 0.75, stateObjects.players[id].y + stateObjects.players[id].height / 2),
-        new PIXI.Point(stateObjects.players[id].x + stateObjects.players[id].width * 0.75, stateObjects.players[id].y + stateObjects.players[id].height / 2 + 400),
-        new PIXI.Point(stateObjects.players[id].x + stateObjects.players[id].width / 4, stateObjects.players[id].y + stateObjects.players[id].height / 2 + 400)]
-        , 10));
-    stateObjects.activeScene.addChild(stateObjects.attacks[stateObjects.attacks.length - 1]);
+    stateObjects.attackWindups.push(new Laser([
+        new PIXI.Point(stateObjects.players[id].x + stateObjects.players[id].width / 4, stateObjects.players[id].y + stateObjects.players[id].height),
+        new PIXI.Point(stateObjects.players[id].x + stateObjects.players[id].width * 0.75, stateObjects.players[id].y + stateObjects.players[id].height),
+        new PIXI.Point(stateObjects.players[id].x + stateObjects.players[id].width * 0.75, stateObjects.players[id].y + stateObjects.players[id].height + windowHeight),
+        new PIXI.Point(stateObjects.players[id].x + stateObjects.players[id].width / 4, stateObjects.players[id].y + stateObjects.players[id].height + windowHeight)]
+        , 10, 0.5));
+    stateObjects.activeScene.addChild(stateObjects.attackWindups[stateObjects.attackWindups.length - 1]);
 }
 
 function shootRightLaser(id) {
-    stateObjects.attacks.push(new Laser([
-        new PIXI.Point(stateObjects.players[id].x + stateObjects.players[id].width / 4, stateObjects.players[id].y + stateObjects.players[id].height / 2),
-        new PIXI.Point(stateObjects.players[id].x + stateObjects.players[id].width * 0.75, stateObjects.players[id].y + stateObjects.players[id].height / 2),
-        new PIXI.Point(stateObjects.players[id].x + stateObjects.players[id].width * 0.75 + 150, stateObjects.players[id].y + stateObjects.players[id].height / 2 + 400),
-        new PIXI.Point(stateObjects.players[id].x + stateObjects.players[id].width / 4 + 150, stateObjects.players[id].y + stateObjects.players[id].height / 2 + 400)]
-        , 10));
-    stateObjects.activeScene.addChild(stateObjects.attacks[stateObjects.attacks.length - 1]);
+    stateObjects.attackWindups.push(new Laser([
+        new PIXI.Point(stateObjects.players[id].x + stateObjects.players[id].width / 2, stateObjects.players[id].y + stateObjects.players[id].height),
+        new PIXI.Point(stateObjects.players[id].x + stateObjects.players[id].width, stateObjects.players[id].y + stateObjects.players[id].height),
+        new PIXI.Point(stateObjects.players[id].x + stateObjects.players[id].width + 150, stateObjects.players[id].y + stateObjects.players[id].height + windowHeight),
+        new PIXI.Point(stateObjects.players[id].x + stateObjects.players[id].width / 2 + 150, stateObjects.players[id].y + stateObjects.players[id].height + windowHeight)]
+        , 10, 0.5));
+    stateObjects.activeScene.addChild(stateObjects.attackWindups[stateObjects.attackWindups.length - 1]);
 }
 
 function playerLogin(id) {
@@ -418,17 +432,17 @@ function switchState(newState) {
                 stateObjects.controllerScene.addChild(jumpButton);
             } else {
                 //Adds the laser buttons to the controller
-                const leftLaserButton = new TouchButton(10, 245, 120, 150, 0xFF0000, 3, 0xFFFF00, outlineAlpha = 1, "Laser", buttonStyle);
+                const leftLaserButton = new TouchButton(10, 245, 120, 150, 0xFF0000, 3, 0xFFFF00, outlineAlpha = 1, "Laser\n/\n/  ", buttonStyle);
                 leftLaserButton.onHoverStart = function (e) {
                     client.event.emit(`leftLaser${worldID}`, stateObjects.playerID);
                 };
                 stateObjects.controllerScene.addChild(leftLaserButton);
-                const laserButton = new TouchButton(140, 245, 120, 150, 0xFF0000, 3, 0xFFFF00, outlineAlpha = 1, "Laser", buttonStyle);
+                const laserButton = new TouchButton(140, 245, 120, 150, 0xFF0000, 3, 0xFFFF00, outlineAlpha = 1, "Laser\n|\n|", buttonStyle);
                 laserButton.onHoverStart = function (e) {
                     client.event.emit(`laser${worldID}`, stateObjects.playerID);
                 };
                 stateObjects.controllerScene.addChild(laserButton);
-                const rightLaserButton = new TouchButton(270, 245, 120, 150, 0xFF0000, 3, 0xFFFF00, outlineAlpha = 1, "Laser", buttonStyle);
+                const rightLaserButton = new TouchButton(270, 245, 120, 150, 0xFF0000, 3, 0xFFFF00, outlineAlpha = 1, "Laser\n\\\n  \\", buttonStyle);
                 rightLaserButton.onHoverStart = function (e) {
                     client.event.emit(`rightLaser${worldID}`, stateObjects.playerID);
                 };

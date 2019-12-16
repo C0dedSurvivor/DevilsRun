@@ -155,12 +155,15 @@ class Ground extends PIXI.Graphics {
 }
 
 class Laser extends PIXI.Graphics {
-    constructor(points, timer) {
+    constructor(points, timer, alpha = 1) {
         super();
+        this.points = points;
         this.boundingObjects = [new CollisionPoly(points)];
+        this.alpha = alpha;
         this.beginFill(0xf7f719);
         this.drawPolygon(points);
         this.endFill();
+        this.fullTimer = timer;
         this.timer = timer;
     }
 
