@@ -23,7 +23,7 @@ function pointIntersection(point, min, max) {
 }
 
 function intersection(min1, max1, min2, max2) {
-    return pointIntersection(min1, min2, max2) || pointIntersection(max1, min2, max2);
+    return pointIntersection(min1, min2, max2) || pointIntersection(max1, min2, max2) || pointIntersection(min2, min1, max1) || pointIntersection(max2, min1, max1);
 }
 
 function getClosestCeilingDistance(player) {

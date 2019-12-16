@@ -41,52 +41,30 @@ function joinRoom() {
     roomDocRef.get().then(function (doc) {
         if (doc.exists) {
             console.log("Document data:", doc.data());
-            roomDocRef.collection("data").doc("playerCount").get().then(function (doc) {
-                if (doc.exists) {
-                    let playerCount = doc.data().count;
-                    if (playerCount <= 7) {
-                        roomDocRef.collection("data").doc("playerCount").update({
-                            count: firebase.firestore.FieldValue.increment(1)
-                        });
-                        stateObjects.playerID = playerCount;
-                        document.querySelector("main").innerHTML = "";
-                        generateView(room);
-                    } else {
-                        console.log("Sorry! Room is full.");
-                        document.querySelector("#roombutton").removeAttribute("disabled");
+            db.runTransaction(function (transaction) {
+                return transaction.get(roomDocRef.collection("data").doc("playerCount")).then(function (roomDoc) {
+                    if (!roomDoc.exists) {
+                        throw "Document does not exist!";
                     }
-                } else {
-                    // doc.data() will be undefined in this case
-                    console.log("That room is not valid!");
-                }
-            }).catch(function (error) {
-                console.log("Error getting document:", error);
+
+                    let playerCount = roomDoc.data().count + 1;
+                    if (playerCount <= 8) {
+                        transaction.update(roomDocRef.collection("data").doc("playerCount"), { count: firebase.firestore.FieldValue.increment(1) });
+                        return playerCount - 1;
+                    } else {
+                        return Promise.reject("Sorry! Room is full.");
+                    }
+                });
+            }).then(function (playerID) {
+                stateObjects.playerID = playerID;
+                document.querySelector("main").innerHTML = "";
+                generateView(room);
+            }).catch(function (err) {
+                // This will be an "room is full" error.
+                console.error(err);
+                document.querySelector("#roombutton").removeAttribute("disabled");
             });
 
-            /*             db.runTransaction(function (transaction) {
-                            return transaction.get(roomDocRef.collection("data").doc("playerCount")).then(function (roomDoc) {
-                                if (!roomDoc.exists) {
-                                    throw "Document does not exist!";
-                                }
-            
-                                let playerCount = roomDoc.data().count + 1;
-                                if (playerCount <= 8) {
-                                    transaction.update(roomDocRef.collection("data").doc("playerCount"), { count: playerCount });
-                                    return playerCount - 1;
-                                } else {
-                                    return Promise.reject("Sorry! Room is full.");
-                                }
-                            });
-                        }).then(function (playerID) {
-                            stateObjects.playerID = playerID;
-                            document.querySelector("main").innerHTML = "";
-                            generateView(room);
-                        }).catch(function (err) {
-                            // This will be an "room is full" error.
-                            console.error(err);
-                            document.querySelector("#roombutton").removeAttribute("disabled");
-                        });
-             */
         } else {
             // doc.data() will be undefined in this case
             console.log("That room is not valid!");
@@ -220,7 +198,9 @@ function setupDisplay() {
     client.event.subscribe(`moveLeft${worldID}`, moveLeft);
     client.event.subscribe(`moveRight${worldID}`, moveRight);
     client.event.subscribe(`jump${worldID}`, jump);
-    client.event.subscribe(`laser${worldID}`, shootLaser);
+    client.event.subscribe(`leftLaser${worldID}`, shootLeftLaser);
+    client.event.subscribe(`laser${worldID}`, shootDownwardLaser);
+    client.event.subscribe(`rightLaser${worldID}`, shootRightLaser);
     client.event.subscribe(`stopMove${worldID}`, stopMove);
     client.event.subscribe(`switchRunner${worldID}`, switchRunner);
     client.event.subscribe(`switchDevil${worldID}`, switchDevil);
@@ -346,15 +326,54 @@ function play(delta) {
                 i--;
             }
         }
+        for (let i = 0; i < stateObjects.players.length; i++) {
+            if (stateObjects.players[i] instanceof Player) {
+                if (stateObjects.players[i].iFrameTimer <= 0) {
+                    for (let j = 0; j < stateObjects.attacks.length; j++) {
+                        if (colliding(stateObjects.players[i], stateObjects.attacks[j])) {
+                            console.log("COLLIDING!!!");
+                        } else {
+                            console.log("not colliding");
+                        }
+                    }
+                } else {
+                    stateObjects.players[i].iFrameTimer -= delta;
+                }
+            }
+        }
     }
 }
 
 function control(delta) {
 }
 
-function shootLaser(id) {
-    stateObjects.attacks.push(new Laser(stateObjects.players[id].x + stateObjects.players[id].width / 4, stateObjects.players[id].y + stateObjects.players[id].height / 2,
-        stateObjects.players[id].width / 2, 400, 10));
+function shootLeftLaser(id) {
+    stateObjects.attacks.push(new Laser([
+        new PIXI.Point(stateObjects.players[id].x + stateObjects.players[id].width / 4, stateObjects.players[id].y + stateObjects.players[id].height / 2),
+        new PIXI.Point(stateObjects.players[id].x + stateObjects.players[id].width * 0.75, stateObjects.players[id].y + stateObjects.players[id].height / 2),
+        new PIXI.Point(stateObjects.players[id].x + stateObjects.players[id].width * 0.75 - 150, stateObjects.players[id].y + stateObjects.players[id].height / 2 + 400),
+        new PIXI.Point(stateObjects.players[id].x + stateObjects.players[id].width / 4 - 150, stateObjects.players[id].y + stateObjects.players[id].height / 2 + 400)]
+        , 10));
+    stateObjects.activeScene.addChild(stateObjects.attacks[stateObjects.attacks.length - 1]);
+}
+
+function shootDownwardLaser(id) {
+    stateObjects.attacks.push(new Laser([
+        new PIXI.Point(stateObjects.players[id].x + stateObjects.players[id].width / 4, stateObjects.players[id].y + stateObjects.players[id].height / 2),
+        new PIXI.Point(stateObjects.players[id].x + stateObjects.players[id].width * 0.75, stateObjects.players[id].y + stateObjects.players[id].height / 2),
+        new PIXI.Point(stateObjects.players[id].x + stateObjects.players[id].width * 0.75, stateObjects.players[id].y + stateObjects.players[id].height / 2 + 400),
+        new PIXI.Point(stateObjects.players[id].x + stateObjects.players[id].width / 4, stateObjects.players[id].y + stateObjects.players[id].height / 2 + 400)]
+        , 10));
+    stateObjects.activeScene.addChild(stateObjects.attacks[stateObjects.attacks.length - 1]);
+}
+
+function shootRightLaser(id) {
+    stateObjects.attacks.push(new Laser([
+        new PIXI.Point(stateObjects.players[id].x + stateObjects.players[id].width / 4, stateObjects.players[id].y + stateObjects.players[id].height / 2),
+        new PIXI.Point(stateObjects.players[id].x + stateObjects.players[id].width * 0.75, stateObjects.players[id].y + stateObjects.players[id].height / 2),
+        new PIXI.Point(stateObjects.players[id].x + stateObjects.players[id].width * 0.75 + 150, stateObjects.players[id].y + stateObjects.players[id].height / 2 + 400),
+        new PIXI.Point(stateObjects.players[id].x + stateObjects.players[id].width / 4 + 150, stateObjects.players[id].y + stateObjects.players[id].height / 2 + 400)]
+        , 10));
     stateObjects.activeScene.addChild(stateObjects.attacks[stateObjects.attacks.length - 1]);
 }
 
@@ -385,28 +404,35 @@ function switchState(newState) {
         if (isMobile) {
             stateObjects.controllerScene.visible = true;
             stateObjects.activeScene = stateObjects.controllerScene;
+            let buttonStyle = {
+                fontFamily: 'Arial',
+                fontSize: 24,
+                fill: "black"
+            };
             if (stateObjects.team == "Runners") {
                 //Adds the jump button to the controller
-                const jumpButton = new TouchButton(10, 245, 380, 150, 0xFF0000, 3, 0xFFFF00, outlineAlpha = 1, "Jump", {
-                    fontFamily: 'Arial',
-                    fontSize: 24,
-                    fill: "black"
-                });
+                const jumpButton = new TouchButton(10, 245, 380, 150, 0xFF0000, 3, 0xFFFF00, outlineAlpha = 1, "Jump", buttonStyle);
                 jumpButton.onHoverStart = function (e) {
                     client.event.emit(`jump${worldID}`, stateObjects.playerID);
                 };
                 stateObjects.controllerScene.addChild(jumpButton);
             } else {
-                //Adds the laser button to the controller
-                const laserButton = new TouchButton(10, 245, 380, 150, 0xFF0000, 3, 0xFFFF00, outlineAlpha = 1, "Laser", {
-                    fontFamily: 'Arial',
-                    fontSize: 24,
-                    fill: "black"
-                });
+                //Adds the laser buttons to the controller
+                const leftLaserButton = new TouchButton(10, 245, 120, 150, 0xFF0000, 3, 0xFFFF00, outlineAlpha = 1, "Laser", buttonStyle);
+                leftLaserButton.onHoverStart = function (e) {
+                    client.event.emit(`leftLaser${worldID}`, stateObjects.playerID);
+                };
+                stateObjects.controllerScene.addChild(leftLaserButton);
+                const laserButton = new TouchButton(140, 245, 120, 150, 0xFF0000, 3, 0xFFFF00, outlineAlpha = 1, "Laser", buttonStyle);
                 laserButton.onHoverStart = function (e) {
                     client.event.emit(`laser${worldID}`, stateObjects.playerID);
                 };
                 stateObjects.controllerScene.addChild(laserButton);
+                const rightLaserButton = new TouchButton(270, 245, 120, 150, 0xFF0000, 3, 0xFFFF00, outlineAlpha = 1, "Laser", buttonStyle);
+                rightLaserButton.onHoverStart = function (e) {
+                    client.event.emit(`rightLaser${worldID}`, stateObjects.playerID);
+                };
+                stateObjects.controllerScene.addChild(rightLaserButton);
             }
         }
         else {

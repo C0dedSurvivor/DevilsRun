@@ -5,6 +5,17 @@ class Mover extends PIXI.Graphics {
         this.vy = 0;
     }
 
+    get boundingObjects() {
+        return [
+            new CollisionPoly([
+                new PIXI.Point(this.x, this.y),
+                new PIXI.Point(this.x + this.width, this.y),
+                new PIXI.Point(this.x + this.width, this.y + this.height),
+                new PIXI.Point(this.x, this.y + this.height)
+            ])
+        ]
+    }
+
     move(delta) {
         this.vy += this.ay * delta;
         //If falling
@@ -62,9 +73,9 @@ class Player extends Mover {
         let label = new PIXI.Text(id, {
             fontFamily: 'Arial',
             fontSize: 24,
-            fill: "white"
+            fill: "white",
+            align: "center"
         });
-        label.style.align = 'center';
         label.anchor.set(0.5, 0.5);
         label.x = 20;
         label.y = 20;
@@ -73,6 +84,7 @@ class Player extends Mover {
         this.y = y;
         this.ay = GRAVITY;
         this.health = 100;
+        this.iFrameTimer = 0;
     }
 }
 
@@ -80,15 +92,17 @@ class Devil extends Mover {
     constructor(id, color = 0xFF0000, x = 125, y = 40) {
         super();
         this.beginFill(color);
-        this.drawCircle(0, 0, 20);
+        this.drawRect(0, 0, 40, 40);
         this.endFill();
         let label = new PIXI.Text(id, {
             fontFamily: 'Arial',
             fontSize: 24,
-            fill: "white"
+            fill: "white",
+            align: "center"
         });
-        label.style.align = 'center';
         label.anchor.set(0.5, 0.5);
+        label.x = 20;
+        label.y = 20;
         this.addChild(label);
         this.x = x;
         this.y = y;
@@ -141,13 +155,12 @@ class Ground extends PIXI.Graphics {
 }
 
 class Laser extends PIXI.Graphics {
-    constructor(x, y, width, height, timer) {
+    constructor(points, timer) {
         super();
+        this.boundingObjects = [new CollisionPoly(points)];
         this.beginFill(0xf7f719);
-        this.drawRect(0, 0, width, height);
+        this.drawPolygon(points);
         this.endFill();
-        this.x = x;
-        this.y = y;
         this.timer = timer;
     }
 
@@ -157,22 +170,15 @@ class Laser extends PIXI.Graphics {
 }
 
 class CollisionPoly {
-    constructor(vertexList){
+    constructor(vertexList) {
         this.vertexList = vertexList;
     }
 }
 
 class CollisionCircle {
-    constructor(x, y, radius){
+    constructor(x, y, radius) {
         this.x = x;
         this.y = y;
         this.radius = radius;
-    }
-}
-
-class Vector2{
-    constructor(x, y){
-        this.x = x;
-        this.y = y;
     }
 }
