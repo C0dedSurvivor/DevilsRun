@@ -121,6 +121,7 @@ class Devil extends Mover {
         this.leftLaserCD = 0;
         this.centerLaserCD = 0;
         this.rightLaserCD = 0;
+        this.health = 1;
     }
 
     update(delta) {

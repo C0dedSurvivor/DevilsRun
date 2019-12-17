@@ -47,32 +47,37 @@ function joinRoom() {
     roomDocRef.get().then(function (doc) {
         if (doc.exists) {
             console.log("Document data:", doc.data());
-            db.runTransaction(function (transaction) {
-                return transaction.get(roomDocRef.collection("data").doc("playerCount")).then(function (roomDoc) {
-                    if (!roomDoc.exists) {
-                        throw "Document does not exist!";
-                    }
-
-                    let playerCount = roomDoc.data().count + 1;
-                    if (playerCount <= 8) {
-                        transaction.update(roomDocRef.collection("data").doc("playerCount"), { count: firebase.firestore.FieldValue.increment(1) });
-                        return playerCount - 1;
-                    } else {
-                        return Promise.reject("Sorry! Room is full.");
-                    }
-                });
+            db.runTransaction(async function (transaction) {
+                const roomDoc = await transaction.get(roomDocRef.collection("data").doc("playerCount"));
+                const stateDoc = await transaction.get(roomDocRef.collection("data").doc("gameState"));
+                if (!roomDoc.exists || !stateDoc.exists) {
+                    throw "Document does not exist!";
+                }
+                if (stateDoc.data().state != "setup") {
+                    return Promise.reject("Sorry! This room is already in game.");
+                }
+                let playerCount = roomDoc.data().count + 1;
+                if (playerCount <= 8) {
+                    transaction.update(roomDocRef.collection("data").doc("playerCount"), { count: firebase.firestore.FieldValue.increment(1) });
+                    transaction.update(roomDocRef.collection("data").doc("gameState"), {});
+                    return Promise.resolve(playerCount - 1);
+                } else {
+                    return Promise.reject("Sorry! Room is full.");
+                }
             }).then(function (playerID) {
                 stateObjects.playerID = playerID;
                 document.querySelector("main").innerHTML = "";
                 generateView(room);
             }).catch(function (err) {
-                // This will be an "room is full" error.
+                // This will be an "room is full" or "Already in game" error.
                 console.error(err);
+                window.alert(err);
                 document.querySelector("#roombutton").removeAttribute("disabled");
             });
 
         } else {
             // doc.data() will be undefined in this case
+            window.alert("That room does not exist. Please try a different room code.");
             console.log("That room is not valid!");
             document.querySelector("#roombutton").removeAttribute("disabled");
         }
@@ -250,7 +255,7 @@ function setupDisplay() {
     stateObjects.teamSelectScene.addChild(stateObjects.playerTeamText);
     app.stage.addChild(stateObjects.teamSelectScene);
 
-    let instructions = new PIXI.Text(`Connect on your phone by going to\nhttps://people.rit.edu/jbb7824/DevilsRunTest\nand using room code ${worldID}.\n When everyone has joined, press Enter to start the game`, {
+    let instructions = new PIXI.Text(`Connect on your phone by going to\nhttps://people.rit.edu/jbb7824/DevilsRun\nand using room code ${worldID}.\n When everyone has joined, press Enter to start the game`, {
         fontFamily: 'Arial',
         fontSize: 18,
         fill: "black",
@@ -423,8 +428,8 @@ function shootLeftLaser(id) {
     if (stateObjects.players[id].leftLaserCD <= 0) {
         stateObjects.attackWindups.push(new Laser([
             new PIXI.Point(stateObjects.players[id].x, stateObjects.players[id].y + stateObjects.players[id].height),
-            new PIXI.Point(stateObjects.players[id].x + stateObjects.players[id].width / 2, stateObjects.players[id].y + stateObjects.players[id].height),
-            new PIXI.Point(stateObjects.players[id].x + stateObjects.players[id].width / 2 - 150, stateObjects.players[id].y + stateObjects.players[id].height + windowHeight),
+            new PIXI.Point(stateObjects.players[id].x + stateObjects.players[id].width / 4, stateObjects.players[id].y + stateObjects.players[id].height),
+            new PIXI.Point(stateObjects.players[id].x + stateObjects.players[id].width / 4 - 150, stateObjects.players[id].y + stateObjects.players[id].height + windowHeight),
             new PIXI.Point(stateObjects.players[id].x - 150, stateObjects.players[id].y + stateObjects.players[id].height + windowHeight)]
             , 50, 0.3));
         stateObjects.activeScene.addChild(stateObjects.attackWindups[stateObjects.attackWindups.length - 1]);
@@ -435,10 +440,10 @@ function shootLeftLaser(id) {
 function shootDownwardLaser(id) {
     if (stateObjects.players[id].centerLaserCD <= 0) {
         stateObjects.attackWindups.push(new Laser([
-            new PIXI.Point(stateObjects.players[id].x + stateObjects.players[id].width / 4, stateObjects.players[id].y + stateObjects.players[id].height),
-            new PIXI.Point(stateObjects.players[id].x + stateObjects.players[id].width * 0.75, stateObjects.players[id].y + stateObjects.players[id].height),
-            new PIXI.Point(stateObjects.players[id].x + stateObjects.players[id].width * 0.75, stateObjects.players[id].y + stateObjects.players[id].height + windowHeight),
-            new PIXI.Point(stateObjects.players[id].x + stateObjects.players[id].width / 4, stateObjects.players[id].y + stateObjects.players[id].height + windowHeight)]
+            new PIXI.Point(stateObjects.players[id].x + 3 * stateObjects.players[id].width / 8, stateObjects.players[id].y + stateObjects.players[id].height),
+            new PIXI.Point(stateObjects.players[id].x + 5 * stateObjects.players[id].width / 8, stateObjects.players[id].y + stateObjects.players[id].height),
+            new PIXI.Point(stateObjects.players[id].x + 5 * stateObjects.players[id].width / 8, stateObjects.players[id].y + stateObjects.players[id].height + windowHeight),
+            new PIXI.Point(stateObjects.players[id].x + 3 * stateObjects.players[id].width / 8, stateObjects.players[id].y + stateObjects.players[id].height + windowHeight)]
             , 50, 0.3));
         stateObjects.activeScene.addChild(stateObjects.attackWindups[stateObjects.attackWindups.length - 1]);
         stateObjects.players[id].centerLaserCD = 120;
@@ -448,10 +453,10 @@ function shootDownwardLaser(id) {
 function shootRightLaser(id) {
     if (stateObjects.players[id].rightLaserCD <= 0) {
         stateObjects.attackWindups.push(new Laser([
-            new PIXI.Point(stateObjects.players[id].x + stateObjects.players[id].width / 2, stateObjects.players[id].y + stateObjects.players[id].height),
+            new PIXI.Point(stateObjects.players[id].x + 3 * stateObjects.players[id].width / 4, stateObjects.players[id].y + stateObjects.players[id].height),
             new PIXI.Point(stateObjects.players[id].x + stateObjects.players[id].width, stateObjects.players[id].y + stateObjects.players[id].height),
             new PIXI.Point(stateObjects.players[id].x + stateObjects.players[id].width + 150, stateObjects.players[id].y + stateObjects.players[id].height + windowHeight),
-            new PIXI.Point(stateObjects.players[id].x + stateObjects.players[id].width / 2 + 150, stateObjects.players[id].y + stateObjects.players[id].height + windowHeight)]
+            new PIXI.Point(stateObjects.players[id].x + 3 * stateObjects.players[id].width / 4 + 150, stateObjects.players[id].y + stateObjects.players[id].height + windowHeight)]
             , 50, 0.3));
         stateObjects.activeScene.addChild(stateObjects.attackWindups[stateObjects.attackWindups.length - 1]);
         stateObjects.players[id].rightLaserCD = 120;
