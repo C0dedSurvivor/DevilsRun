@@ -70,21 +70,32 @@ class Player extends Mover {
         this.beginFill(color);
         this.drawRect(0, 0, 40, 40);
         this.endFill();
-        let label = new PIXI.Text(id, {
+        this.label = new PIXI.Text(id, {
             fontFamily: 'Arial',
             fontSize: 24,
             fill: "white",
             align: "center"
         });
-        label.anchor.set(0.5, 0.5);
-        label.x = 20;
-        label.y = 20;
-        this.addChild(label);
+        this.label.anchor.set(0.5, 0.5);
+        this.label.x = 20;
+        this.label.y = 20;
+        this.addChild(this.label);
         this.x = x;
         this.y = y;
         this.ay = GRAVITY;
-        this.health = 100;
+        this.health = 3;
         this.iFrameTimer = 0;
+    }
+
+    die() {
+        this.clear();
+        this.beginFill(0xa1a1a1);
+        this.drawRect(10, 0, 20, 40);
+        this.drawRect(0, 10, 40, 10);
+        this.endFill();
+        this.label.style.fill = "black";
+        this.vx = 0;
+        this.vy = 0;
     }
 }
 
@@ -107,6 +118,21 @@ class Devil extends Mover {
         this.x = x;
         this.y = y;
         this.ay = 0;
+        this.leftLaserCD = 0;
+        this.centerLaserCD = 0;
+        this.rightLaserCD = 0;
+    }
+
+    update(delta) {
+        if (this.leftLaserCD > 0) {
+            this.leftLaserCD -= delta;
+        }
+        if (this.centerLaserCD > 0) {
+            this.centerLaserCD -= delta;
+        }
+        if (this.rightLaserCD > 0) {
+            this.rightLaserCD -= delta;
+        }
     }
 }
 

@@ -1,9 +1,13 @@
 function moveLeft(value) {
-    stateObjects.players[value].vx = -3;
+    if (stateObjects.players[value].health > 0) {
+        stateObjects.players[value].vx = -4;
+    }
 }
 
 function moveRight(value) {
-    stateObjects.players[value].vx = 3;
+    if (stateObjects.players[value].health > 0) {
+        stateObjects.players[value].vx = 4;
+    }
 }
 
 function stopMove(value) {
@@ -11,10 +15,12 @@ function stopMove(value) {
 }
 
 function jump(value) {
-    console.log("Trying to jump");
-    if (getClosestFloorDistance(stateObjects.players[value]) == 0) {
-        console.log("Jumping");
-        stateObjects.players[value].vy = -17;
+    if (stateObjects.players[value].health > 0) {
+        console.log("Trying to jump");
+        if (getClosestFloorDistance(stateObjects.players[value]) == 0) {
+            console.log("Jumping");
+            stateObjects.players[value].vy = -17;
+        }
     }
 }
 
